@@ -1,0 +1,74 @@
+.report-container {
+  max-width: auto;
+  margin: auto;
+  
+}
+.report-title {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #222;
+  margin-bottom: 1.5rem;
+}
+.report-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(53, 122, 189, 0.08);
+  margin-bottom: 2rem;
+  padding: 2rem 2.5rem;
+  
+}
+.report-section-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1.2rem;
+}
+.report-label {
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+.report-input {
+  width: 600px;
+  padding: 0.6rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  background: #fafbfc;
+  box-sizing: border-box;
+}
+.report-btn-red {
+  width: 100px;
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.8rem 0;
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.report-btn-red:hover {
+  background: #c0392b;
+}
+.report-sent-card {
+  background: #fff9c4;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  position: relative;
+}
+.report-delete {
+  color: #e74c3c;
+  cursor: pointer;
+  font-weight: bold;
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  justify-content: center;
+  display: flex;
+} 

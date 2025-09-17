@@ -1,0 +1,46 @@
+body, input, select, textarea, button {
+  font-family: 'Sarabun', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  max-width: 100%;
+  margin: auto;
+  padding: 0.5rem;
+  background: #f4f6fa;
+  min-height: 80vh;
+  box-sizing: border-box;
+}
+
+@media (min-width: 640px) {
+  .app-container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .app-container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .app-container {
+    max-width: 1280px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .app-container {
+    max-width: 1536px;
+  }
+}

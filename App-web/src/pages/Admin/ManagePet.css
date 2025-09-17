@@ -1,0 +1,121 @@
+body {
+  font-family: 'Kanit', 'Prompt', 'Segoe UI', 'Arial', sans-serif;
+  background: #f4f6fa;
+}
+
+.managepet-container {
+  max-width: auto;
+  margin: auto;
+  padding: 0;
+  background: none;
+}
+
+.managepet-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(53, 122, 189, 0.08);
+  margin-bottom: 2rem;
+  padding: 2rem 2.5rem;
+}
+
+.managepet-title {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+  color: #222;
+  
+  
+}
+
+.managepet-label {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  margin-top: 1rem;
+  color: #222;
+  
+}
+
+.managepet-list {
+  margin-bottom: 1.5rem;
+}
+.managepet-list li {
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.managepet-text {
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+
+.managepet-input {
+  margin: 5px;
+  max-width: 400px;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  background: #fafbfc;
+  box-sizing: border-box;
+}
+
+.managepet-btn {
+  width: 100px;
+  background: #2979ff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.8rem 0;
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.managepet-btn:hover {
+  background: #1565c0;
+}
+
+.pet-card {
+  background: #d6ebff;
+  border-radius: 10px;
+  padding: 1rem 2rem 1rem 1.5rem;
+  margin-bottom: 1.2rem;
+  min-height: 150px;
+  max-width: 300px;
+  width: 100%;
+  
+  box-sizing: border-box;
+} 
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 90%;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 1rem;
+}

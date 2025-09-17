@@ -1,0 +1,159 @@
+/* Dashboard Layout */
+.dashboard-container {
+  background: #f4f7fa;
+  min-height: 100vh;
+  /* padding: 2rem 0; */
+}
+
+.dashboard-card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  margin-bottom: 2rem;
+  padding: 2rem;
+}
+
+.dashboard-title {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #222;
+  margin-bottom: 1.5rem;
+  
+}
+
+.dashboard-label {
+  font-weight: 600;
+  margin-right: 1rem;
+}
+
+.dashboard-select {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 1rem;
+  background: #f9fafb;
+  transition: border 0.2s;
+}
+.dashboard-select:focus {
+  border: 1.5px solid #357abd;
+  outline: none;
+}
+
+.dashboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dashboard-table th, .dashboard-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+.dashboard-table th {
+  background: #f1f5f9;
+  color: #357abd;
+  font-weight: 700;
+}
+.dashboard-table tr:last-child td {
+  border-bottom: none;
+}
+.dashboard-table td {
+  color: #333;
+}
+.dashboard-table .status {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.btn-clear {
+  background-color: #e74c3c;  /* bg-orange-500 */
+  color: #ffffff;             /* text-white */
+  padding-left: 1rem;         /* px-4 = 16px */
+  padding-right: 1rem;
+  padding-top: 0.7rem;        /* py-2 = 8px */
+  padding-bottom: 0.7rem;
+  border-radius: 0.5rem;     /* rounded = 4px */
+  cursor: pointer;            /* ทำให้กดได้ */
+  border: none;
+  transition: background-color 0.2s ease; /* smooth hover */
+  font-size: 1rem;
+}
+
+.btn-clear:hover {
+  background-color: #c1392a;  /* bg-orange-600 */
+}
+
+.gap {
+  display: flex;
+  gap: 1.5rem; /* ระยะห่างระหว่างปุ่ม */
+  justify-content: space-between;
+}
+
+.btn-close {
+  background-color: #a3a9b4; /* bg-gray-500 */
+  color: #ffffff;           /* text-white */
+  padding-left: 1rem;       /* px-4 */
+  padding-right: 1rem;
+  padding-top: 0.5rem;      /* py-2 */
+  padding-bottom: 0.5rem;
+  border-radius: 0.5rem;   /* rounded */
+  transition: background-color 0.2s ease-in-out;
+  border: none;
+  font-size: 1rem;
+}
+
+.btn-close:hover {
+  background-color: #8f9399; /* bg-gray-600 */
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.detail-his {
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+.text-no {
+  text-align: center;   /* text-center */
+  padding-top: 1rem;    /* py-4 = 16px */
+  padding-bottom: 1rem;
+}
+
+.btn-seeHis {
+  background-color: #3b82f6;  /* bg-blue-500 */
+  color: #ffffff;            /* text-white */
+  padding-left: 0.7rem;      /* px-2 = 8px */
+  padding-right: 0.7rem;
+  padding-top: 0.5rem;      /* py-1 = 4px */
+  padding-bottom: 0.5rem;
+  border-radius: 0.5rem;    /* rounded = 4px */
+  font-size: 1rem;        /* text-xs = 12px */
+  line-height: 1rem;
+  transition: background-color 0.2s ease-in-out;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-seeHis:hover {
+  background-color: #2563eb;  /* bg-blue-600 */
+}
+/* Responsive */
+@media (max-width: 700px) {
+  .dashboard-card {
+    padding: 1rem;
+  }
+  .dashboard-title {
+    font-size: 1.3rem;
+  }
+  .dashboard-table th, .dashboard-table td {
+    padding: 0.5rem 0.3rem;
+    font-size: 0.95rem;
+  }
+}

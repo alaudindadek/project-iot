@@ -1,0 +1,157 @@
+
+.safezone-container {
+  max-width: auto;
+  padding: 0;
+  background: none;
+  border-radius: 12px;
+  
+}
+
+.a {
+  background-color: #f3f4f6; /* เทียบเท่า bg-gray-100 */
+  
+}
+
+.safezone-title {
+   font-size: 2rem;
+  font-weight: bold;
+  color: #222;
+  margin-bottom: 1.5rem;
+}
+
+.safezone-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(53, 122, 189, 0.08);
+  margin-bottom: 2rem;
+  padding: 2rem;
+  
+}
+
+.safezone-ladel {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+  color: #222;
+}
+
+.safezone-map{
+  background: #eceef1;
+  border-radius: 8px;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.safezone-btn-red {
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.6rem 1.5rem;
+    font-size: 1rem;
+    font-weight: bold;
+    margin-top: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.safezone-btn-red:hover {
+    background: #c0392b;
+}
+  
+  .safezone-btn-green {
+    background: #27ae60;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.6rem 1.5rem;
+    font-size: 1rem;
+    font-weight: bold;
+    margin-top: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.safezone-btn-green:hover {
+    background: #219150;
+}
+
+.safezone-text {
+    font-weight: bold;
+    margin-bottom: 0.3rem;
+    display: block;
+}
+
+.content {
+  font-size: 1.1rem;
+  color: #333;
+} 
+
+.safezone-input {
+    width: 300px;
+    /* max-width: 50%; */
+    padding: 0.6rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    background: #fafbfc;
+  
+}
+
+.safezone-list {
+    margin-top: 1rem;
+}
+
+.safezone-list li {
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.safezone-list .dot {
+    color: #e74c3c;
+    margin-right: 0.5rem;
+}
+
+.managepet-table {
+  width: 100%;
+  /* border-collapse: collapse; */
+  margin-top: 1rem;
+  background: #fafbfc;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.managepet-table th, .managepet-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+.managepet-table th {
+  background: #f0f4fa;
+  color: #357abd;
+  font-weight: bold;
+  border-bottom: 2px solid #e3e8ee;
+}
+.managepet-table tr:nth-child(even) {
+  background: #f7fafd;
+}
+.managepet-table tr:hover {
+  background: #e3f0ff;
+}
+
+.managepet-list-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.pet-card {
+  background: #d9ecff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(53,122,189,0.06);
+  padding: 1rem 1.5rem;
+  min-width: 180px;
+  flex: 1 1 200px;
+}
+
