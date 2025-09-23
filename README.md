@@ -31,15 +31,9 @@ A full-stack web application for tracking and managing pets in real-time.
 - Leaflet + React-Leaflet for maps
 - EmailJS for sending notifications
 
-### Backend
-- Node.js + Express.js
-- cors, dotenv for configuration
-- MongoDB (via Mongoose) and MySQL (via mysql2)
-
-### Database / Services
-- Firebase Firestore / Realtime Database for real-time updates (if used)
+### Backend / Services
+- Firebase Firestore / Realtime Database for real-time updates
 - Firebase Auth for authentication
-- Firebase Hosting / Functions (optional serverless backend)
 
 ## GitHub
 [https://github.com/alaudindadek]
