@@ -36,4 +36,4 @@ A full-stack web application for tracking and managing pets in real-time.
 - Firebase Auth for authentication
 
 ## GitHub
-[https://github.com/alaudindadek]
+[https://github.com/alaudindadek/project-iot]
