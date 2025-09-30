@@ -446,6 +446,62 @@ export const filterPetsByAllSafezones = (pets, safezones) => {
   return { inside, outside };
 };
 
+// export const filterPetsByAllSafezones = (pets, safezones) => {
+//   const inside = [];
+//   const outside = [];
+//   const now = Date.now();
+
+//   pets.forEach(pet => {
+//     if (pet.lat == null || pet.lng == null) return;
+
+//     const position = new window.google.maps.LatLng(Number(pet.lat), Number(pet.lng));
+//     let foundZone = null;
+
+//     for (const zone of safezones) {
+//       if (!Array.isArray(zone.coordinates) || zone.coordinates.length === 0) continue;
+
+//       const polygon = new window.google.maps.Polygon({
+//         paths: zone.coordinates.map(c => ({
+//           lat: Number(c.lat),
+//           lng: Number(c.lng),
+//         })),
+//       });
+
+//       if (window.google.maps.geometry.poly.containsLocation(position, polygon)) {
+//         foundZone = zone;
+//         break;
+//       }
+//     }
+
+//     if (foundZone) {
+//       inside.push({ ...pet, safezoneId: foundZone.id, safezoneName: foundZone.name });
+//       console.log(`สัตว์ "${pet.name}" อยู่ใน safezone: ${foundZone.name}`);
+//       petStatusMap[pet.id] = { isOutside: false, lastExitTime: null };
+//     } else {
+//       outside.push(pet);
+//       console.log(`สัตว์ "${pet.name}" อยู่นอก safezone`);
+//       const prevStatus = petStatusMap[pet.id] || { isOutside: false, lastExitTime: null };
+//       if (!prevStatus.isOutside) sendPetAlertEmail(pet.id, pet.caregiverId);
+//       petStatusMap[pet.id] = { isOutside: true, lastExitTime: now };
+//     }
+//   });
+
+//   // interval เดิมของคุณสามารถคงไว้ได้
+//   if (intervalId) clearInterval(intervalId);
+//   if (outside.length > 0) {
+//     intervalId = setInterval(() => {
+//       outside.forEach(pet => {
+//         if (petStatusMap[pet.id]?.isOutside) {
+//           sendPetAlertEmail(pet.id, pet.caregiverId);
+//         }
+//       });
+//     }, 60000);
+//   }
+
+//   return { inside, outside };
+// };
+
+
 
 
 

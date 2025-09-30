@@ -186,7 +186,7 @@ const RoleManagement = () => {
                       </option>
                     ))}
                 </select>
-              </div>s
+              </div>
 
               <div className="form-group">
                 <label>บทบาทใหม่:</label>
