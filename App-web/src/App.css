@@ -13,7 +13,6 @@ body, input, select, textarea, button {
   background: #f4f6fa;
   min-height: 80vh;
   box-sizing: border-box;
-  margin-top: 5rem;
 }
 
 @media (min-width: 640px) {

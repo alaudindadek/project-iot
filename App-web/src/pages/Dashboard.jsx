@@ -1,6 +1,6 @@
-import React, { useEffect, useState , useMemo} from "react";
+import React, { useEffect, useState } from "react";
 import { db, rtdb } from "../firebase";
-import { collection, getDocs , query, where} from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
 import {
   GoogleMap,
@@ -18,7 +18,6 @@ import {
   unsubscribeAllPetLocationUpdates,
   cleanAllHistory,
 } from "../PetLocationHistory";
-import { useAuth } from "../contexts/AuthContext";
 
 const mapContainerStyle = { width: "100%", height: "550px" };
 const defaultCenter = { lat: 7.012004316421167, lng: 100.49736863544827 };
@@ -26,7 +25,6 @@ const defaultCenter = { lat: 7.012004316421167, lng: 100.49736863544827 };
 import { filterPetsByAllSafezones } from "../ChackLocation"; // นำเข้าฟังก์ชันที่ใช้ตรวจสอบตำแหน่งสัตว์
 
 const Dashboard = () => {
-  const { user } = useAuth();
   const [safezones, setSafezones] = useState([]);
   const [selectedZone, setSelectedZone] = useState(null);
   const [pets, setPets] = useState([]);
@@ -48,87 +46,32 @@ const Dashboard = () => {
     googleMapsApiKey: "AIzaSyCHMaJZvvPadPj5BlZs_oR_iy_wtg9OiqI",
   });
 
-  // // โหลด safezones และ pets จาก Firestore
-  // useEffect(() => {
-  //   const fetchData = async () => {
-  //     setLoading(true);
-
-  //     // ดึง safezones
-  //     const safezoneSnap = await getDocs(collection(db, "safezones"));
-  //     const safezoneList = [];
-  //     safezoneSnap.forEach((doc) =>
-  //       safezoneList.push({ id: doc.id, ...doc.data() })
-  //     );
-  //     setSafezones(safezoneList);
-  //     // เลือก safezone แรกเป็น default
-  //     if (safezoneList.length > 0) setSelectedZone(safezoneList[0].id);
-
-  //     // ดึง pets จาก Firestore
-  //     const petsSnap = await getDocs(collection(db, "pets"));
-  //     const petsList = [];
-  //     petsSnap.forEach((doc) => petsList.push({ id: doc.id, ...doc.data() }));
-  //     console.log("Loaded pets from Firestore:", petsList);
-  //     setPetsFirestore(petsList);
-
-  //     setLoading(false);
-  //   };
-  //   fetchData();
-  // }, []);
-
-  // ---- โหลด Safezones ตาม role ----
+  // โหลด safezones และ pets จาก Firestore
   useEffect(() => {
-    const fetchSafezones = async () => {
-      try {
-        let q;
-        if (user.role === "owner") {
-          // owner เห็นทั้งหมด
-          q = collection(db, "safezones");
-        } else if (user.role === "caregiver") {
-          // caregiver เห็นเฉพาะ safezone ที่ตัวเองถูก assign
-          q = query(
-            collection(db, "safezones"),
-            where("caregiverId", "==", user.uid)
-          );
-        }
-
-        const snapshot = await getDocs(q);
-        const safezoneData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        setSafezones(safezoneData);
-      } catch (err) {
-        console.error("Error fetching safezones:", err);
-      }
-    };
-
-    if (user) {
-      fetchSafezones();
-    }
-  }, [user]);
-
-  // โหลด pets จาก Firestore
-useEffect(() => {
-  const fetchPets = async () => {
-    try {
+    const fetchData = async () => {
       setLoading(true);
+
+      // ดึง safezones
+      const safezoneSnap = await getDocs(collection(db, "safezones"));
+      const safezoneList = [];
+      safezoneSnap.forEach((doc) =>
+        safezoneList.push({ id: doc.id, ...doc.data() })
+      );
+      setSafezones(safezoneList);
+      // เลือก safezone แรกเป็น default
+      if (safezoneList.length > 0) setSelectedZone(safezoneList[0].id);
+
+      // ดึง pets จาก Firestore
       const petsSnap = await getDocs(collection(db, "pets"));
       const petsList = [];
-      petsSnap.forEach((doc) =>
-        petsList.push({ id: doc.id, ...doc.data() })
-      );
+      petsSnap.forEach((doc) => petsList.push({ id: doc.id, ...doc.data() }));
       console.log("Loaded pets from Firestore:", petsList);
       setPetsFirestore(petsList);
-    } catch (err) {
-      console.error("Error fetching pets:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  fetchPets();
-}, []);
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
 
   // ดึงข้อมูลตำแหน่งจาก Realtime Database
   useEffect(() => {
@@ -204,7 +147,7 @@ useEffect(() => {
 
       return () => {
         unsubscribe();
-        console.log("Stopped auto-history subscription");
+        console.log("🛑 Stopped auto-history subscription");
       };
     }
   }, [pets, safezones]);
@@ -216,7 +159,7 @@ useEffect(() => {
     };
   }, []);
 
-  // // เมื่อเลือก Safe Zone หรือ pets เปลี่ยน ให้ filter
+  // เมื่อเลือก Safe Zone หรือ pets เปลี่ยน ให้ filter
   useEffect(() => {
     if (!selectedZone || selectedZone === "all") {
       if (safezones.length === 0) {
@@ -224,7 +167,6 @@ useEffect(() => {
         setOutsidePets([]);
         return;
       }
-      
       const { inside, outside } = filterPetsByAllSafezones(pets, safezones);
       setFilteredPets(inside);
       setOutsidePets(outside);
@@ -249,49 +191,6 @@ useEffect(() => {
     setFilteredPets(inside);
     setOutsidePets(outside);
   }, [selectedZone, pets, safezones]);
-
-  // // Filter pets inside/outside safezones
-  // useEffect(() => {
-  //   if (pets.length === 0 || safezones.length === 0) {
-  //     setFilteredPets([]);
-  //     setOutsidePets([]);
-  //     return;
-  //   }
-
-  //   // สำหรับ caregiver: ตรวจสอบ pets กับ safezone ของ caregiver ทั้งหมด
-  //   const ChackSafezone =
-  //     user.role === "caregiver"
-  //       ? safezones.filter((z) => z.caregiverId === user.id)
-  //       : safezones;
-
-  //   let inside = [];
-  //   let outside = [];
-
-  //   if (!selectedZone || selectedZone === "all") {
-  //     //
-  //     const result = filterPetsByAllSafezones(pets, ChackSafezone);
-  //     inside = result.inside;
-  //     outside = result.outside;
-  //   } else {
-  //     // ถ้าเลือก safezone เฉพาะ (selectedZone) ให้กรองสำหรับ dropdown display
-  //   const zoneObj = safezones.find((z) => z.id === selectedZone);
-
-  //   if (!zoneObj) {
-  //     // ไม่มี safezone แสดงว่า caregiver ไม่มีพื้นที่ assigned
-  //     setFilteredPets([]);
-  //     setOutsidePets([]);
-  //     return;
-  //   }
-
-  //   // ใช้ safezonesForCheck สำหรับเช็ก inside/outside จริง
-  //   const result = filterPetsByAllSafezones(pets, [zoneObj]);
-  //   inside = result.inside;
-  //   outside = result.outside;
-  //   }
-
-  //   setFilteredPets(inside);
-  //   setOutsidePets(outside);
-  // }, [pets, safezones, selectedZone, user]);
 
   // *** ใช้ getPetLocationHistory แทน ***
   const fetchPetHistory = async (petId, deviceId) => {
@@ -412,24 +311,6 @@ useEffect(() => {
   // หา Safe Zone ที่เลือก
   const selectedZoneObj = safezones.find((z) => z.id === selectedZone);
 
-  // const ShowPets = useMemo(() => {
-  //   if (!user) return [];
-  //   if (user.role === "caregiver") {
-  //      console.log("user", user);
-  // console.log("all safezones", safezones);
-  //     // caregiver เห็นเฉพาะสัตว์ที่อยู่ใน safezone ของตัวเอง
-  //     const caregiverSafezones = safezones.filter((z) => z.caregiverId === user.id);
-  //     console.log("caregiverSafezones", caregiverSafezones);
-  // console.log("pets", pets);
-  //     const { inside } = filterPetsByAllSafezones(pets, caregiverSafezones);
-  //     console.log("inside", inside);
-  //     return inside;
-  //   } else {
-  //     // owner เห็นทั้งหมด
-  //     return pets;
-  //   }
-  // }, [pets, safezones, user]);
-
   return (
     <div className="dashboard-container">
       {/* Main Content */}
@@ -488,24 +369,21 @@ useEffect(() => {
 
         {/* Safe Zone Dropdown */}
         <div className="dashboard-card mb-5">
-         <h2 className="dashboard-label">เลือก Safe Zone</h2>
-
-  {safezones.length === 0 ? (
-    <p>ไม่พบข้อมูล Safe Zone</p>
-  ) : (
-    <select
-      className="dashboard-select"
-      value={selectedZone || "all"}
-      onChange={(e) => setSelectedZone(e.target.value)}
-    >
-      <option value="all">ทั้งหมด</option>
-      {safezones.map((zone) => (
-        <option key={zone.id} value={zone.id}>
-          {zone.name}
-        </option>
-      ))}
-    </select>
-  )}
+          <h2 className="dashboard-label">
+            เลือก Safe Zone
+          </h2>
+          <select
+            className="dashboard-select"
+            value={selectedZone || "all"}
+            onChange={(e) => setSelectedZone(e.target.value)}
+          >
+            <option value="all">ทั้งหมด</option>
+            {safezones.map((zone) => (
+              <option key={zone.id} value={zone.id}>
+                {zone.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Map Section */}
