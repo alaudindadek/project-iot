@@ -361,9 +361,6 @@ export const sendPetAlertEmail = async (petId, caregiverId) => {
   }
 };
 
-// สถานะสัตว์ที่อยู่นอก safezone
-const petStatusMap = {};
-
 const normalizePolygon = (coords) => {
   if (!Array.isArray(coords)) return [];
   return coords.map(c => Array.isArray(c) ? { lat: Number(c[0]), lng: Number(c[1]) } : { lat: Number(c.lat), lng: Number(c.lng) });
@@ -387,6 +384,10 @@ const pointInPolygon = (point, polygon) => {
   }
   return inside;
 };
+
+// สถานะสัตว์ที่อยู่นอก safezone
+const petStatusMap = {};
+let intervalId = null;
 
 export const filterPetsByAllSafezones = (pets, safezones) => {
   console.log("เรียก filterPetsByAllSafezones", new Date().toLocaleTimeString())
@@ -424,7 +425,27 @@ export const filterPetsByAllSafezones = (pets, safezones) => {
 
     }
   });
-  
 
+  // ตั้ง interval เพื่อตรวจสอบสัตว์ที่อยู่นอก safezone ทุกๆ 1 นาที
+
+  // เคลียร์ intervalId ของเก่า
+  if (intervalId) clearInterval(intervalId);
+
+  if (outside.length > 0) {
+    intervalId = setInterval(() => {
+      outside.forEach(pet => {
+        if (petStatusMap[pet.id]?.isOutside) {
+          console.log(`ส่งเตือนซ้ำสำหรับสัตว์ "${pet.name}" ที่อยู่นอก safezone`);
+          sendPetAlertEmail(pet.id, pet.caregiverId);
+        }
+      });
+    }, 60000); // ทุกๆ 1 นาที
+  }
+
+  
   return { inside, outside };
 };
+
+
+
+

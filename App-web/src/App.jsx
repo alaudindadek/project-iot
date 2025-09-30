@@ -8,13 +8,10 @@ import ManagePet from './pages/Admin/ManagePet';
 import RoleManagement from './pages/Admin/RoleManagement';
 import SafeZone from './pages/User/SafeZone';
 import Report from './pages/User/Report';
-import Notification from './pages/Admin/Notification';
-import AddAlert from './pages/User/AlertSet';
+import Notification from './pages/Notification';
 import SetAccout from './pages/AccountSettings';
-
 import Navbar from './components/Navbar';
 import AuthNavbar from './components/AuthNavbar';
-
 import './App.css';
 
 const AppContent = () => {
@@ -38,7 +35,7 @@ const AppContent = () => {
           <Route path="/notification" element={<Notification />} />
           <Route path="/safezone" element={<SafeZone />} />
           <Route path="/report" element={<Report />} />
-          <Route path="/alert-set" element={<AddAlert />} />
+          {/* <Route path="/alert-set" element={<AddAlert />} /> */}
           <Route path="/account-setting" element={<SetAccout />} />
         </Routes>
       </div>

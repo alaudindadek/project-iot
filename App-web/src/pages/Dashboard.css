@@ -11,6 +11,7 @@
   box-shadow: 0 2px 12px rgba(0,0,0,0.07);
   margin-bottom: 2rem;
   padding: 2rem;
+  overflow-x: auto;
 }
 
 .dashboard-title {
@@ -50,7 +51,7 @@
 .dashboard-table th, .dashboard-table td {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid #e5e7eb;
-  text-align: left;
+  text-align: center;
 }
 .dashboard-table th {
   background: #f1f5f9;

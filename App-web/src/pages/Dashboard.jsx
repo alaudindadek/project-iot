@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { db, rtdb } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
-import Navbar from "../components/Navbar";
 import {
   GoogleMap,
   useLoadScript,
@@ -11,7 +10,6 @@ import {
   Polyline,
 } from "@react-google-maps/api";
 import "./Dashboard.css";
-import { sendPetAlertEmail } from "../ChackLocation"
 
 // นำเข้าฟังก์ชันจาก PetLocationHistory.js
 import {
@@ -86,18 +84,6 @@ const Dashboard = () => {
 
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-  // interval ส่งอีเมลทุกๆ 1 นาที
-  const interval = setInterval(() => {
-    outsidePets.forEach(pet => {
-      console.log("⏰ ส่งเมลซ้ำเพราะยังอยู่นอก safezone", pet.name, new Date().toLocaleTimeString());
-      sendPetAlertEmail(pet.id, pet.caregiverId);
-    });
-  }, 60000); // 60000 ms = 1 นาที
-
-  return () => clearInterval(interval);
-}, [outsidePets]);
 
   // รวมข้อมูลจาก Firestore (pets) และ Realtime Database (lora_data)
   useEffect(() => {
@@ -328,7 +314,6 @@ const Dashboard = () => {
   return (
     <div className="dashboard-container">
       {/* Main Content */}
-      {/* <Navbar /> */}
       <main>
         <header>
           <div>
@@ -338,34 +323,36 @@ const Dashboard = () => {
 
         {/* แสดงสัตว์เลี้ยงทั้งหมด */}
         <div className="dashboard-card">
-          <h2 className="dashboard-label" >รายชื่อสัตว์เลี้ยงทั้งหมด</h2>
+          <h2 className="dashboard-label">
+            รายชื่อสัตว์เลี้ยงทั้งหมด
+          </h2>
           {pets.length === 0 ? (
             <p>ไม่พบข้อมูลสัตว์เลี้ยง</p>
           ) : (
             <table className="dashboard-table">
               <thead>
-                <tr className="bg-gray-100">
-                  <th className="p-2 border">ชื่อสัตว์</th>
-                  <th className="p-2 border">อายุ</th>
-                  <th className="p-2 border">สายพันธุ์</th>
-                  <th className="p-2 border">Device ID</th>
-                  <th className="p-2 border">ละติจูด</th>
-                  <th className="p-2 border">ลองจิจูด</th>
-                  <th className="p-2 border">แบตเตอรี่ (%)</th>
-                  <th className="p-2 border">ประวัติ</th>
+                <tr>
+                  <th>ชื่อสัตว์</th>
+                  <th>อายุ</th>
+                  <th>สายพันธุ์</th>
+                  <th>Device ID</th>
+                  <th>ละติจูด</th>
+                  <th>ลองจิจูด</th>
+                  <th>แบตเตอรี่ (%)</th>
+                  <th>ประวัติ</th>
                 </tr>
               </thead>
               <tbody>
                 {pets.map((pet) => (
                   <tr key={pet.id}>
-                    <td className="p-2 border">{pet.name}</td>
-                    <td className="p-2 border">{pet.age || "-"}</td>
-                    <td className="p-2 border">{pet.breed || "-"}</td>
-                    <td className="p-2 border">{pet.device_id || "-"}</td>
-                    <td className="p-2 border">{pet.lat}</td>
-                    <td className="p-2 border">{pet.lng}</td>
-                    <td className="p-2 border">{pet.battery || "-"}</td>
-                    <td className="p-2 border">
+                    <td>{pet.name}</td>
+                    <td>{pet.age || "-"}</td>
+                    <td>{pet.breed || "-"}</td>
+                    <td>{pet.device_id || "-"}</td>
+                    <td>{pet.lat}</td>
+                    <td>{pet.lng}</td>
+                    <td>{pet.battery || "-"}</td>
+                    <td>
                       <button
                         onClick={() => handleShowHistory(pet)}
                         className="btn-seeHis"
@@ -382,7 +369,9 @@ const Dashboard = () => {
 
         {/* Safe Zone Dropdown */}
         <div className="dashboard-card mb-5">
-          <h2 className="dashboard-label">เลือก Safe Zone</h2>
+          <h2 className="dashboard-label">
+            เลือก Safe Zone
+          </h2>
           <select
             className="dashboard-select"
             value={selectedZone || "all"}
@@ -409,7 +398,6 @@ const Dashboard = () => {
               ` — ประวัติ ${selectedPetForHistory.name}`}
           </h2>
           <div
-            className="w-full bg-gray-300 flex justify-center items-center"
             style={{ padding: 0 }}
           >
             {isLoaded ? (
@@ -742,7 +730,7 @@ const Dashboard = () => {
         {/* ตารางสัตว์เลี้ยงใน Safe Zone */}
         {!showHistory && (
           <div className="dashboard-card">
-            <h2 className="text-lg font-bold mb-2">
+            <h2 className="dashboard-label">
               รายละเอียดตำแหน่งที่อยู่ในพื้นที่ Safe Zone
             </h2>
             {loading ? (
@@ -754,33 +742,32 @@ const Dashboard = () => {
             ) : (
               <table className="dashboard-table">
                 <thead>
-                  <tr className="bg-gray-100">
-                    <th className="p-2 border">ชื่อสัตว์</th>
-                    <th className="p-2 border">อายุ</th>
-                    <th className="p-2 border">สายพันธุ์</th>
-                    <th className="p-2 border">Device ID</th>
-                    <th className="p-2 border">ละติจูด</th>
-                    <th className="p-2 border">ลองจิจูด</th>
-                    <th className="p-2 border">วันที่</th>
-                    <th className="p-2 border">เวลา</th>
-                    <th className="p-2 border">Battery (%)</th>
-                    <th className="p-2 border">Safe Zone</th>
+                  <tr>
+                    <th>ชื่อสัตว์</th>
+                    <th>อายุ</th>
+                    <th>สายพันธุ์</th>
+                    <th>Device ID</th>
+                    <th>ละติจูด</th>
+                    <th>ลองจิจูด</th>
+                    <th>วันที่</th>
+                    <th>เวลา</th>
+                    <th>Battery (%)</th>
+                    <th>Safe Zone</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPets.map((pet) => (
                     <tr key={pet.id}>
-                      <td className="p-2 border">{pet.name}</td>
-                      <td className="p-2 border">{pet.age || "-"}</td>
-                      <td className="p-2 border">{pet.breed || "-"}</td>
-                      <td className="p-2 border">{pet.device_id || "-"}</td>
-                      <td className="p-2 border">{pet.lat}</td>
-                      <td className="p-2 border">{pet.lng}</td>
-                      <td className="p-2 border">{pet.date || "-"}</td>
-                      <td className="p-2 border">{pet.time || "-"}</td>
-                      <td className="p-2 border">{pet.battery || "-"}</td>
-                      <td className="p-2 border text-green-600">
-                        {pet.safezoneName || "-"}
+                      <td>{pet.name}</td>
+                      <td>{pet.age || "-"}</td>
+                      <td>{pet.breed || "-"}</td>
+                      <td>{pet.device_id || "-"}</td>
+                      <td>{pet.lat}</td>
+                      <td>{pet.lng}</td>
+                      <td>{pet.date || "-"}</td>
+                      <td>{pet.time || "-"}</td>
+                      <td>{pet.battery || "-"}</td>
+                      <td>{pet.safezoneName || "-"}
                       </td>
                     </tr>
                   ))}

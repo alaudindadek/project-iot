@@ -12,13 +12,18 @@ const Navbar = () => {
 
   // Real-time count for admin notification
   useEffect(() => {
-    if (user && user.role === 'owner') {
+    if (!user) {
+      setNotifCount(0);
+      return;
+    }
+    if (user.role === 'owner' || user.role === "caregiver") {
       const reportsRef = ref(rtdb, 'reports');
       const unsubscribe = onValue(reportsRef, (snapshot) => {
         const data = snapshot.val();
         let count = 0;
         if (data) {
-          count = Object.keys(data).length;
+          const reportsForMe = Object.values(data).filter(r => r.receiver === user.uid);
+          count = reportsForMe.length;
         }
         setNotifCount(count);
       });
@@ -67,11 +72,20 @@ const isActive = (path) => location.pathname.startsWith(path);
     <nav style={{
       background: '#357abd',
       color: 'white',
-      padding: '1rem',
+      paddingTop: '1rem',
+      paddingBottom: '1rem',
+      paddingLeft: '2rem',
+      paddingRight: '2rem',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
       height: '60px',
+      zIndex: 1000,
+      position: 'fixed',
+      width: '100%',
+      top: 0,
+      left: 0,
+      Left: '5px',
     }}>
       {/* Left side - Brand */}
       <div style={{ 
@@ -84,7 +98,7 @@ const isActive = (path) => location.pathname.startsWith(path);
         display: 'flex', 
         alignItems: 'center',
         justifyContent: 'center',
-        flex: 1
+        flex: 1,
       }}>
         {/* {!user && (
           <Link to="/login" style={{ color: 'white', textDecoration: 'none' }}>Login</Link>
@@ -152,9 +166,10 @@ const isActive = (path) => location.pathname.startsWith(path);
       <div style={{ 
         display: 'flex', 
         alignItems: 'center',
-        gap: '1rem'
+        gap: '1rem',
+        marginRight: '2rem',
       }}>
-        {user && user.role === 'owner' && (
+        {user && (user.role === 'owner' || user.role === "caregiver") && (
           <Link to="/notification" style={{ 
             color: isActive('/notification') ? '#ffd700' : 'white',
             position: 'relative',
@@ -213,7 +228,8 @@ const isActive = (path) => location.pathname.startsWith(path);
               borderRadius: '5px', 
               border: 'none', 
               cursor: 'pointer',
-              fontSize: '20px'
+              fontSize: '20px',
+              marginRight: '1REM',
             }}>Logout</button>
           </div>
         )}

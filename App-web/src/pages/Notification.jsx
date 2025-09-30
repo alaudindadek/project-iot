@@ -1,30 +1,36 @@
 import React, { useEffect, useState } from 'react';
-import { rtdb } from '../../firebase';
+import { rtdb } from '../firebase';
 import { ref, onValue, remove } from 'firebase/database';
 import { getDocs, collection } from 'firebase/firestore';
-import { db } from '../../firebase';
-import Navbar from '../../components/Navbar';
+import { db } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
+
 
 const Notification = () => {
+  const { user } = useAuth();
   const [reports, setReports] = useState([]);
   const [pets, setPets] = useState([]);
   const [users, setUsers] = useState([]);
 
   // โหลดรายงานทั้งหมดจาก rtdb
   useEffect(() => {
+    if (!user) return;
     const reportsRef = ref(rtdb, 'reports');
     const unsubscribe = onValue(reportsRef, (snapshot) => {
       const data = snapshot.val();
       const reportsData = [];
       if (data) {
         Object.entries(data).forEach(([key, value]) => {
-          reportsData.push({ id: key, ...value });
+          if (value.receiver === user.uid) {
+            reportsData.push({ id: key, ...value });
+          }
+          
         });
       }
       setReports(reportsData);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   // โหลดรายชื่อสัตว์เลี้ยงทั้งหมด
   useEffect(() => {
