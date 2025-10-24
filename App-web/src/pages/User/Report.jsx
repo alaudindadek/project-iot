@@ -4,8 +4,9 @@ import { collection, getDocs } from 'firebase/firestore';
 import { rtdb } from '../../firebase';
 import { ref, push, set, onValue, remove } from 'firebase/database';
 import { useAuth } from '../../contexts/AuthContext';
-import Navbar from '../../components/Navbar';
 import './Report.css';
+
+import { sendReportAlertEmail } from '../../alert';
 
 const Report = () => {
   const { user } = useAuth();
@@ -75,6 +76,8 @@ const Report = () => {
     try {
       // บันทึกลง rtdb
       const newReportRef = push(ref(rtdb, 'reports'));
+      const reportId = newReportRef.key;
+
       await set(newReportRef, {
         pet,
         problem,
@@ -83,9 +86,33 @@ const Report = () => {
         sender: user.uid,
         createdAt: new Date().toISOString()
       });
+
+      // หาข้อมูลสัตว์
+      const petObj = pets.find(p => p.id === pet);
+      const petName = petObj?.name || 'สัตว์เลี้ยง';
+
+      // ส่งอีเมลแจ้งเตือนผู้รับ
+      const emailSent = await sendReportAlertEmail(
+        reportId,
+        pet,
+        petName,
+        problem,
+        detail,
+        user.uid,
+        receiver
+      );
+
+      if (emailSent?.success) {
+        alert('ส่งรายงานสำเร็จและแจ้งเตือนไปยังผู้รับแล้ว');
+      } else {
+        alert('ส่งรายงานสำเร็จ แต่แจ้งเตือนไปยังผู้รับไม่สำเร็จ');
+      }
+      
+      // รีเซ็ตฟอร์ม
       setPet('');
       setProblem('');
       setDetail('');
+
       // ไม่ต้อง reload reports ตรงนี้ เพราะ useEffect จะ sync อัตโนมัติจาก rtdb
     } catch (err) {
       alert('เกิดข้อผิดพลาดในการส่งรายงาน: ' + err.message);
@@ -98,6 +125,7 @@ const Report = () => {
     setLoading(true);
     try {
       await remove(ref(rtdb, 'reports/' + id));
+      alert('ลบรายงานสำเร็จ');
       // ไม่ต้อง setReports เพราะ useEffect จะ sync อัตโนมัติ
     } catch (err) {
       alert('เกิดข้อผิดพลาดในการลบรายงาน: ' + err.message);
@@ -110,7 +138,7 @@ const Report = () => {
     <div className="report-container">
       <h1 className="report-title">รายงานปัญหาสัตว์เลี้ยง</h1>
       <div className="report-card">
-        <div className="report-section-title">รายงานปัญหาใหม่</div>
+        <div className="report-section-title">รายงานปัญหา</div>
         <form onSubmit={handleSubmit}>
           <label className="report-label">เลือกสัตว์ที่พบปัญหา</label>
           <select className="report-input" value={pet} onChange={e => setPet(e.target.value)} required>
@@ -122,6 +150,9 @@ const Report = () => {
             <option value="">-- เลือก --</option>
             <option value="สัตว์หายตัว">สัตว์หายตัว</option>
             <option value="อุปกรณ์เสียหาย">อุปกรณ์เสียหาย</option>
+            <option value="สัตว์ป่วย">สัตว์ป่วย</option>
+            <option value="สัตว์บาดเจ็บ">สัตว์บาดเจ็บ</option>
+            <option value="พฤติกรรมผิดปกติ">พฤติกรรมผิดปกติ</option>
             <option value="อื่นๆ">อื่นๆ</option>
           </select>
           <label className="report-label">รายละเอียดเพิ่มเติม</label>
@@ -157,8 +188,8 @@ const Report = () => {
             return (
               <div className="report-sent-card" key={r.id} style={{ position: 'relative', display: 'flex', flexDirection: 'column', minHeight: '80px' }}>
                 <b>{petObj ? petObj.name : r.pet}</b>{petObj && petObj.breed ? ` (${petObj.breed})` : ''} - {r.problem}
-                <div>รายละเอียด: {r.detail || '-'}</div>
-                <div>ส่งถึง: <span role="img" aria-label="receiver">📩</span> {receiverUser ? `${receiverUser.username} (${receiverUser.role})` : r.receiver}</div>
+                <div>รายละเอียด: {r.detail || 'ไม่มีรายละเอียดเพิ่มเติม'}</div>
+                <div>ส่งถึง: <span role="img" aria-label="receiver"></span> {receiverUser ? `${receiverUser.username} (${receiverUser.role})` : r.receiver}</div>
                 <div style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
                   <span className="report-delete" onClick={() => handleDelete(r.id)}>ลบ</span>
                 </div>

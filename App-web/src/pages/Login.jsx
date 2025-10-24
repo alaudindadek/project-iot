@@ -5,13 +5,11 @@ import { rtdb, db } from '../firebase';
 import { ref, get } from 'firebase/database';
 import { useAuth } from '../contexts/AuthContext';
 import { collection ,getDocs} from 'firebase/firestore';
-// import Navbar from "../components/Navbar";
 import './Auth.css';
 
-import { messaging } from '../firebase'; // เพิ่ม
-import { getToken } from 'firebase/messaging'; // เพิ่ม
-import { doc, setDoc } from 'firebase/firestore'; // เพิ่ม
-
+import { messaging } from '../firebase'; 
+import { getToken } from 'firebase/messaging'; 
+import { doc, setDoc } from 'firebase/firestore'; 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -50,31 +48,31 @@ const Login = () => {
       await signInWithEmailAndPassword(auth, foundEmail, password);
       // ส่งข้อมูล user+role ไป AuthContext
       setUserWithRole({ username, email: foundEmail, role: foundRole, uid: foundUid });
-      await saveFcmToken(foundUid); // <-- เพิ่มบรรทัดนี้
+      // await saveFcmToken(foundUid); // <-- เพิ่มบรรทัดนี้
       if (foundRole === 'owner') {
-        navigate('/dashboard');
+        navigate('/petTracking');
       } else {
-        navigate('/dashboard'); // เปลี่ยนเส้นทางไปยัง SafeZone หรือหน้าที่ต้องการ
+        navigate('/petTracking'); // เปลี่ยนเส้นทางไปยัง SafeZone หรือหน้าที่ต้องการ
       }
     } catch (error) {
-      setError(error.message); // หรือ error.code
+      setError(error.message);
     } finally {
       setLoading(false);
       
     }
   };
 
-  const saveFcmToken = async (uid) => {
-  try {
-    const token = await getToken(messaging, { vapidKey: "YOUR_VAPID_KEY" }); // ใส่ VAPID_KEY ของคุณ
-    if (token) {
-      await setDoc(doc(db, "users", uid), { fcmToken: token }, { merge: true });
-    }
-  } catch (err) {
-    // ไม่ต้องแจ้ง error กับ user ก็ได้
-    console.error("FCM Token error:", err);
-  }
-};
+//   const saveFcmToken = async (uid) => {
+//   try {
+//     const token = await getToken(messaging, { vapidKey: "YOUR_VAPID_KEY" }); // ใส่ VAPID_KEY ของคุณ
+//     if (token) {
+//       await setDoc(doc(db, "users", uid), { fcmToken: token }, { merge: true });
+//     }
+//   } catch (err) {
+//     // ไม่ต้องแจ้ง error กับ user ก็ได้
+//     console.error("FCM Token error:", err);
+//   }
+// };
 
   return (
     <div className="auth-container">

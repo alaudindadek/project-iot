@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { db } from '../../firebase';
 import { collection, addDoc, getDocs, deleteDoc, doc , updateDoc  } from 'firebase/firestore';
 import { GoogleMap, useLoadScript, DrawingManager, Polygon } from '@react-google-maps/api';
-import Navbar from '../../components/Navbar';
 import { query, where } from 'firebase/firestore';
 import './SafeZone.css';
 
@@ -34,43 +33,9 @@ const SafeZone = () => {
     fetchZones();
   }, []);
 
-
-// โหลด Safe Zone จาก Firestore เฉพาะของ caregiver ปัจจุบัน
-// useEffect(() => {
-//   const fetchZones = async () => {
-//     const user = auth.currentUser;
-//     if (!user) return;
-
-//     // ดึง userData เพื่อเอา username หรือ userId มา filter
-//     const usersRef = collection(db, 'users');
-//     const qUser = query(usersRef, where('email', '==', user.email));
-//     const userSnap = await getDocs(qUser);
-//     if (userSnap.empty) {
-//       console.error("ไม่พบข้อมูลผู้ใช้ใน Firestore");
-//       return;
-//     }
-//     const userData = userSnap.docs[0].data();
-//     const username = userData.username; // หรือจะใช้ userId ก็ได้
-
-//     // ดึง safezones เฉพาะของ caregiver คนนี้
-//     const zonesRef = collection(db, 'safezones');
-//     const qZones = query(zonesRef, where('createdBy', '==', username));
-//     const zonesSnapshot = await getDocs(qZones);
-
-//     const zonesData = [];
-//     zonesSnapshot.forEach((docSnap) => {
-//       zonesData.push({ id: docSnap.id, zoneId: docSnap.id, ...docSnap.data() });
-//     });
-//     setZones(zonesData);
-//   };
-
-//   fetchZones();
-// }, [auth.currentUser]);
-
-
   // โหลด Google Maps
   const { isLoaded } = useLoadScript({
-    googleMapsApiKey: 'AIzaSyCHMaJZvvPadPj5BlZs_oR_iy_wtg9OiqI', // <--  API Key 
+    googleMapsApiKey: 'AIzaSyCHMaJZvvPadPj5BlZs_oR_iy_wtg9OiqI', // API Key 
     libraries: libraries
   });
 
@@ -147,8 +112,6 @@ const SafeZone = () => {
     setLoading(false);
   }
   };
-
-
 
   // ฟังก์ชันลบ Safe Zone
   const handleDeleteZone = async (zoneId) => {

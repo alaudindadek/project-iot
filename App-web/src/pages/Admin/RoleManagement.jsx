@@ -5,8 +5,6 @@ import {
   getDocs,
   doc,
   updateDoc,
-  query,
-  where,
 } from "firebase/firestore";
 import "./RoleManagement.css";
 import { getAuth } from "firebase/auth";
@@ -18,8 +16,7 @@ const RoleManagement = () => {
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState("");
-  const [selectedPet, setSelectedPet] = useState("");
-  const [selectedRole, setSelectedRole] = useState("user");
+  const [selectedRole, setSelectedRole] = useState("");
 
   const [selectedZone, setSelectedZone] = useState("");
   const [selectedZoneCaregiver, setSelectedZoneCaregiver] = useState("");
@@ -186,7 +183,7 @@ const RoleManagement = () => {
                       </option>
                     ))}
                 </select>
-              </div>s
+              </div>
 
               <div className="form-group">
                 <label>บทบาทใหม่:</label>

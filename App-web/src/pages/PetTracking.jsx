@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+
+import React, { useEffect, useState , useRef} from "react";
 import { db, rtdb } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { ref, onValue } from "firebase/database";
@@ -11,7 +12,6 @@ import {
 } from "@react-google-maps/api";
 import "./Dashboard.css";
 
-// นำเข้าฟังก์ชันจาก PetLocationHistory.js
 import {
   getPetLocationHistory,
   subscribeMultiplePetLocationUpdates,
@@ -19,14 +19,36 @@ import {
   cleanAllHistory,
 } from "../PetLocationHistory";
 
+import { useAuth } from "../contexts/AuthContext";
+
 const mapContainerStyle = { width: "100%", height: "550px" };
 const defaultCenter = { lat: 7.012004316421167, lng: 100.49736863544827 };
 
-import { filterPetsByAllSafezones } from "../ChackLocation"; // นำเข้าฟังก์ชันที่ใช้ตรวจสอบตำแหน่งสัตว์
+import { filterPetsByAllSafezones } from "../CheckSafeZone"; 
+import { sendBatteryAlertEmail, logBatteryAlert } from "../alert";
 
-const Dashboard = () => {
+// ฟังก์ชันแปลงข้อมูลจาก LoRaData format ทำความสะอาดและแปลงข้อมูลให้พร้อมใช้
+const convertLoRaDataFormat = (data) => {
+  if (!data) return null;
+
+  console.log("Converting data:", data); 
+  
+  return {
+    latitude: parseFloat(data.latitude),
+    longitude: parseFloat(data.longitude),
+    date: data.date ? data.date.replace("Date: ", "").trim() : null,
+    time: data.time ? data.time.replace("Time: ", "").trim() : null,
+    battery: data.battery ?? null,
+    batteryLevel: data.batteryLevel ?? "-", 
+    fixStatus: data.fixStatus ? data.fixStatus.replace(/"/g, "").trim() : null,
+    satellites: data.satellites || 0,
+    deviceName: data.deviceName ? data.deviceName.replace(/"/g, "").trim() : null,
+  };
+};
+
+const PetTracking = () => {
   const [safezones, setSafezones] = useState([]);
-  const [selectedZone, setSelectedZone] = useState(null);
+  const [selectedZone, setSelectedZone] = useState("all");
   const [pets, setPets] = useState([]);
   const [filteredPets, setFilteredPets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,19 +56,27 @@ const Dashboard = () => {
   const [loraData, setLoraData] = useState({});
   const [petsFirestore, setPetsFirestore] = useState([]);
 
-  // เพิ่ม state สำหรับประวัติ
+  // state สำหรับประวัติ
   const [selectedPetForHistory, setSelectedPetForHistory] = useState(null);
   const [petHistory, setPetHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyDateRange, setHistoryDateRange] = useState("today"); // today, week, month, all
+
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+  const [safeZoneFilter, setSafeZoneFilter] = useState("all");
+
+  // const [batteryAlertsSent, setBatteryAlertsSent] = useState({}); // เก็บสถานะการแจ้งเตือนแบตเตอรี่
   
+
+  const { user } = useAuth();
 
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: "AIzaSyCHMaJZvvPadPj5BlZs_oR_iy_wtg9OiqI",
   });
 
-  // โหลด safezones และ pets จาก Firestore
+  // ดึงข้อมูล safezones และ pets จาก Firestore เมื่อ component โหลดครั้งแรก
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -54,38 +84,45 @@ const Dashboard = () => {
       // ดึง safezones
       const safezoneSnap = await getDocs(collection(db, "safezones"));
       const safezoneList = [];
-      safezoneSnap.forEach((doc) =>
-        safezoneList.push({ id: doc.id, ...doc.data() })
-      );
-      setSafezones(safezoneList);
-      // เลือก safezone แรกเป็น default
-      if (safezoneList.length > 0) setSelectedZone(safezoneList[0].id);
+      safezoneSnap.forEach((doc) => {
+        const data = doc.data();
 
-      // ดึง pets จาก Firestore
+        // ถ้าเป็น caregiver ให้แสดงเฉพาะ safezone ที่ assignedCaregivers มี user.uid
+        if (
+          user &&
+          user.role === "caregiver" &&
+          data.caregiverId !== user.uid
+        ) {
+          return; // ข้าม safezone ที่ไม่ได้รับมอบหมาย
+        }
+        safezoneList.push({ id: doc.id, ...data });
+      });
+      setSafezones(safezoneList);
+
+      // โหลด pets จาก Firestore
       const petsSnap = await getDocs(collection(db, "pets"));
       const petsList = [];
       petsSnap.forEach((doc) => petsList.push({ id: doc.id, ...doc.data() }));
-      console.log("Loaded pets from Firestore:", petsList);
       setPetsFirestore(petsList);
 
       setLoading(false);
     };
     fetchData();
-  }, []);
+  }, [user]);
 
-  // ดึงข้อมูลตำแหน่งจาก Realtime Database
+  // ดึงข้อมูลตำแหน่งจาก Realtime Database (LoRaData/Devices)
   useEffect(() => {
-    const locationRef = ref(rtdb, "lora_data");
+    const locationRef = ref(rtdb, "LoRaData/Devices");
     const unsubscribe = onValue(locationRef, (snapshot) => {
       const data = snapshot.val() || {};
-      console.log("Loaded lora_data:", data);
+      console.log("Loaded LoRaData/Devices:", data);
       setLoraData(data);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // รวมข้อมูลจาก Firestore (pets) และ Realtime Database (lora_data)
+  // รวมข้อมูลจาก Firestore (pets) และ Realtime Database (LoRaData)
   useEffect(() => {
     console.log("=== Merging Data ===");
     console.log("petsFirestore:", petsFirestore);
@@ -99,40 +136,114 @@ const Dashboard = () => {
 
     const mergedPets = petsFirestore
       .map((pet) => {
-        console.log(`Processing pet: ${pet.name}, device_id: ${pet.device_id}`);
 
-        // หา device_id ที่ตรงกับสัตว์นี้
+        console.log(`\nPet Name: ${pet.name}`);
+        console.log(`Pet device_id: "${pet.device_id}"`); // ดู device_id ของ pet
+        console.log(`Available devices:`, Object.keys(loraData)); // ดูว่ามี device อะไรบ้าง
         const deviceData = loraData[pet.device_id];
-        console.log(`Device data for ${pet.device_id}:`, deviceData);
 
-        if (deviceData && deviceData.latitude && deviceData.longitude) {
-          // ใช้ตำแหน่งจาก lora_data เท่านั้น
-          const mergedPet = {
-            // คัดลอก properties ทั้งหมดของ object
+        console.log(`   Found deviceData:`, deviceData); // ดูข้อมูล deviceData ที่เจอ
+        const convertedData = convertLoRaDataFormat(deviceData);
+        
+        if (convertedData && convertedData.latitude && convertedData.longitude) {
+          return {
             ...pet,
-            lat: deviceData.latitude,
-            lng: deviceData.longitude,
-            date: deviceData.date || null,
-            time: deviceData.time || null,
-            battery: deviceData.battery || null,
+            lat: convertedData.latitude,
+            lng: convertedData.longitude,
+            date: convertedData.date || "-",
+            time: convertedData.time || "-",
+            battery: convertedData.battery || "-",
+            batteryLevel: convertedData.batteryLevel || "-",
+            fixStatus: convertedData.fixStatus || "-",
+            satellites: convertedData.satellites || 0,
           };
-          console.log("Merged pet:", mergedPet);
-          return mergedPet;
         } else {
-          console.log(
-            `No location data for pet: ${pet.name} (device_id: ${pet.device_id})`
-          );
-          // ไม่มีข้อมูลใน lora_data จะไม่แสดงสัตว์นี้
           return null;
         }
       })
-      .filter((pet) => pet !== null); // กรองเอาเฉพาะที่มีข้อมูลตำแหน่งจาก lora_data
+      .filter((pet) => pet !== null);
 
     console.log("Final merged pets data:", mergedPets);
     setPets(mergedPets);
   }, [petsFirestore, loraData]);
 
-  // *** เพิ่ม: Auto-subscribe เพื่อบันทึกประวัติอัตโนมัติ ***
+ const batteryCheckInProgress = useRef(false);
+const batteryAlertsSentRef = useRef({}); // ✅ เก็บสถานะแจ้งเตือนไม่ให้ส่งซ้ำ
+
+useEffect(() => {
+  if (pets.length === 0 || safezones.length === 0) return;
+
+  const checkBatteryLevels = async () => {
+    if (batteryCheckInProgress.current) {
+      console.log("กำลังตรวจสอบแบตเตอรี่อยู่แล้ว - ข้ามรอบนี้");
+      return;
+    }
+
+    batteryCheckInProgress.current = true;
+
+    for (const pet of pets) {
+      if (!pet.device_id || pet.battery === undefined || pet.battery === "-") continue;
+
+      const batteryLevel = parseInt(pet.battery);
+      if (isNaN(batteryLevel)) {
+        console.warn(`แบตเตอรี่ไม่ใช่ตัวเลข: ${pet.name} - ${pet.battery}`);
+        continue;
+      }
+
+      // ตรวจสอบแบตเตอรี่ต่ำกว่า 20%
+      if (batteryLevel < 20 && !batteryAlertsSentRef.current[pet.device_id]) {
+        console.log(`แจ้งเตือนแบตต่ำ: ${pet.name} (${batteryLevel}%)`);
+
+        try {
+          const petZone = safezones.find(z => z.id === pet.zoneId);
+          const caregiverId = petZone?.caregiverId || user?.uid;
+
+          if (!caregiverId) {
+            console.warn(`ไม่พบ caregiver สำหรับ ${pet.name}`);
+            continue;
+          }
+
+          //บันทึกสถานะว่า "ส่งแล้ว"
+          batteryAlertsSentRef.current[pet.device_id] = Date.now();
+
+          await sendBatteryAlertEmail(pet.id, caregiverId, batteryLevel);
+          await logBatteryAlert(pet.id, pet.name, caregiverId, batteryLevel, pet.device_id);
+
+          console.log(`ส่งการแจ้งเตือนแบตเตอรี่สำเร็จ: ${pet.name}`);
+        } catch (error) {
+          console.error(`ส่งการแจ้งเตือนแบตเตอรี่ล้มเหลว (${pet.name}):`, error);
+        }
+      }
+      
+      // ถ้าแบตกลับมาสูงกว่า 20%
+      if (batteryLevel >= 20 && batteryAlertsSentRef.current[pet.device_id]) {
+        console.log(`แบตกลับมาปกติ: ${pet.name} (${batteryLevel}%)`);
+        delete batteryAlertsSentRef.current[pet.device_id];
+      }
+
+      // รีเซ็ต flag ทุก 30 วินาที
+      const lastAlert = batteryAlertsSentRef.current[pet.device_id];
+      if (lastAlert && Date.now() - lastAlert > 30000) {
+        console.log(`รีเซ็ตการแจ้งเตือนแบตของ ${pet.name}`);
+        delete batteryAlertsSentRef.current[pet.device_id];
+      }
+    }
+
+    batteryCheckInProgress.current = false;
+  };
+
+  // เรียกใช้ทันทีและตั้งเวลาเช็กทุก 30 วิ
+  checkBatteryLevels();
+  const interval = setInterval(checkBatteryLevels, 30000);
+
+  return () => {
+    clearInterval(interval);
+    batteryCheckInProgress.current = false;
+  };
+}, [pets, safezones, user]);
+
+
+  // เพิ่ม Auto-subscribe เพื่อบันทึกประวัติอัตโนมัติ
   useEffect(() => {
     if (pets.length > 0 && safezones.length > 0) {
       const deviceIds = pets.map((pet) => pet.device_id).filter((id) => id);
@@ -147,62 +258,80 @@ const Dashboard = () => {
 
       return () => {
         unsubscribe();
-        console.log("🛑 Stopped auto-history subscription");
+        console.log("Stopped auto-history subscription");
       };
     }
   }, [pets, safezones]);
 
-  // *** เพิ่ม: Cleanup เมื่อ component unmount ***
+  // เพิ่ม Cleanup เมื่อ component unmount
   useEffect(() => {
     return () => {
       unsubscribeAllPetLocationUpdates();
     };
   }, []);
 
-  // เมื่อเลือก Safe Zone หรือ pets เปลี่ยน ให้ filter
+  // กรอง pets ตาม safezone ที่เลือก
+  const assignedZones =
+    user && user.role === "caregiver"
+      ? safezones.filter((z) => z.caregiverId === user.uid)
+      : safezones;
+
+  const zoneIds = assignedZones.map((z) => z.id);
+  const petsInAssignedZones = pets.filter((pet) =>
+    zoneIds.includes(pet.zoneId)
+  );
+
+  // กรอง pets เมื่อ selectedZone, pets, safezones, user เปลี่ยน
   useEffect(() => {
     if (!selectedZone || selectedZone === "all") {
-      if (safezones.length === 0) {
+      if (assignedZones.length === 0) {
         setFilteredPets([]);
         setOutsidePets([]);
         return;
       }
-      const { inside, outside } = filterPetsByAllSafezones(pets, safezones);
+      // ใช้ petsInAssignedZones แทน pets
+      const { inside, outside } = filterPetsByAllSafezones(
+        petsInAssignedZones,
+        assignedZones
+      );
       setFilteredPets(inside);
       setOutsidePets(outside);
       return;
     }
 
-    if (safezones.length === 0) {
+    if (assignedZones.length === 0) {
       setFilteredPets([]);
       setOutsidePets([]);
       return;
     }
 
-    const zone = safezones.find((z) => z.id === selectedZone);
+    const zone = assignedZones.find((z) => z.id === selectedZone);
     if (!zone || !zone.coordinates) {
       setFilteredPets([]);
       setOutsidePets([]);
       return;
     }
 
-    // กรองสัตว์ใน safezone ที่เลือก
-    const { inside, outside } = filterPetsByAllSafezones(pets, [zone]); // ส่งเป็น array เดียวเพื่อกรองแค่ zone นี้
+    // ใช้ petsInAssignedZones เฉพาะ zone ที่เลือก
+    const petsInZone = petsInAssignedZones.filter(
+      (pet) => pet.zoneId === zone.id
+    );
+    const { inside, outside } = filterPetsByAllSafezones(petsInZone, [zone]);
     setFilteredPets(inside);
     setOutsidePets(outside);
-  }, [selectedZone, pets, safezones]);
+  }, [selectedZone, pets, safezones, user]);
 
-  // *** ใช้ getPetLocationHistory แทน ***
+  // ดึงประวัติสตำแหน่ง
   const fetchPetHistory = async (petId, deviceId) => {
     if (!petId || !deviceId) return;
 
     setHistoryLoading(true);
     try {
       // ใช้ฟังก์ชันจาก PetLocationHistory.js
-      const historyList = await getPetLocationHistory(deviceId, 50); // ดึง 50 records
+      const historyList = await getPetLocationHistory(deviceId); // ดึง 50 records
 
       if (historyList.length === 0) {
-        console.log("No history found, creating sample data");
+        console.log("No history found");
         setPetHistory([]);
       } else {
         // กรองตามช่วงเวลา
@@ -247,41 +376,34 @@ const Dashboard = () => {
     setHistoryLoading(false);
   };
 
-  // *** ฟังก์ชันทำความสะอาดประวัติ ***
   const handleCleanOldHistory = async () => {
-    try {
-      let totalCleaned = 0;
-      const deviceIds = pets.map((pet) => pet.device_id).filter((id) => id);
-
-      for (const deviceId of deviceIds) {
-        const cleaned = await cleanAllHistory(deviceId);
-        totalCleaned += cleaned;
-      }
-
-      // *** เพิ่มการ refresh ประวัติหลังจากลบ ***
-      if (selectedPetForHistory) {
-        // Refresh ประวัติของสัตว์ที่กำลังแสดงอยู่
-        await fetchPetHistory(
-          selectedPetForHistory.id,
-          selectedPetForHistory.device_id
-        );
-      }
-
-      alert(`ลบประวัติแล้ว `);
-    } catch (error) {
-      console.error("Error cleaning history:", error);
-      alert("เกิดข้อผิดพลาดในการลบประวัติ");
+  try {
+    if (!selectedPetForHistory || !selectedPetForHistory.device_id) {
+      alert("กรุณาเลือกสัตว์เลี้ยงก่อนลบประวัติ");
+      return;
     }
-  };
 
-  // เมื่อเลือกสัตว์หรือเปลี่ยนช่วงเวลา ให้ดึงประวัติใหม่
+    const deviceId = selectedPetForHistory.device_id;
+    const cleaned = await cleanAllHistory(deviceId);
+
+    // refresh ประวัติของสัตว์ที่กำลังดู
+    await fetchPetHistory(selectedPetForHistory.id, deviceId);
+
+    alert(`ลบประวัติของ ${selectedPetForHistory.name} แล้ว (${cleaned} records)`);
+  } catch (error) {
+    console.error("Error cleaning history:", error);
+    alert("เกิดข้อผิดพลาดในการลบประวัติ");
+  }
+};
+
+
+  // เมื่อเลือกสัตว์หรือเปลี่ยนช่วงเวลา ให้ดึงประวัติใหม่ (refresh)
   useEffect(() => {
     if (selectedPetForHistory) {
       fetchPetHistory(
         selectedPetForHistory.id,
         selectedPetForHistory.device_id
       );
-      // fetchDeviceStats(selectedPetForHistory.device_id); // ดึงสถิติด้วย
     }
   }, [selectedPetForHistory, historyDateRange]);
 
@@ -289,6 +411,9 @@ const Dashboard = () => {
   const handleShowHistory = (pet) => {
     setSelectedPetForHistory(pet);
     setShowHistory(true);
+    setStartDate(null);
+    setEndDate(null);
+    setSafeZoneFilter("all");
   };
 
   // ฟังก์ชันปิดประวัติ
@@ -296,11 +421,43 @@ const Dashboard = () => {
     setShowHistory(false);
     setSelectedPetForHistory(null);
     setPetHistory([]);
+    setStartDate(null);
+    setEndDate(null);
+    setSafeZoneFilter("all");
   };
+
+  const filteredHistory = petHistory.filter((record) => {
+    const recordDate = new Date(record.timestamp);
+
+    // กรองตามช่วงวันที่
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      if (recordDate < start) {
+        return false;
+      }
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      if (recordDate > end) {
+        return false;
+      }
+    }
+
+    //กรองตามสถานะ SafeZone
+    if (safeZoneFilter === "inside" && !record.inSafeZone) {
+      return false;
+    }
+    if (safeZoneFilter === "outside" && record.inSafeZone) {
+      return false;
+    }
+    return true;
+  });
 
   // สร้าง path สำหรับแสดงเส้นทางบนแผนที่
   const getHistoryPath = () => {
-    return petHistory
+    return filteredHistory
       .map((point) => ({
         lat: Number(point.latitude),
         lng: Number(point.longitude),
@@ -321,64 +478,88 @@ const Dashboard = () => {
           </div>
         </header>
 
-        {/* แสดงสัตว์เลี้ยงทั้งหมด */}
-        <div className="dashboard-card">
-          <h2 className="dashboard-label">
-            รายชื่อสัตว์เลี้ยงทั้งหมด
-          </h2>
-          {pets.length === 0 ? (
-            <p>ไม่พบข้อมูลสัตว์เลี้ยง</p>
-          ) : (
-            <table className="dashboard-table">
-              <thead>
-                <tr>
-                  <th>ชื่อสัตว์</th>
-                  <th>อายุ</th>
-                  <th>สายพันธุ์</th>
-                  <th>Device ID</th>
-                  <th>ละติจูด</th>
-                  <th>ลองจิจูด</th>
-                  <th>แบตเตอรี่ (%)</th>
-                  <th>ประวัติ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pets.map((pet) => (
-                  <tr key={pet.id}>
-                    <td>{pet.name}</td>
-                    <td>{pet.age || "-"}</td>
-                    <td>{pet.breed || "-"}</td>
-                    <td>{pet.device_id || "-"}</td>
-                    <td>{pet.lat}</td>
-                    <td>{pet.lng}</td>
-                    <td>{pet.battery || "-"}</td>
-                    <td>
-                      <button
-                        onClick={() => handleShowHistory(pet)}
-                        className="btn-seeHis"
-                      >
-                        ดูประวัติ
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        {/* ตารางสัตว์ที่ caregiver ได้รับมอบหมายดูแล */}
+        {user && (user.role === "caregiver" || user.role === "owner") && (
+          <div className="dashboard-card">
+            <h2 className="dashboard-label">
+              สัตว์ทั้งหมดที่อยู่ใน Safe Zone 
+            </h2>
+            {safezones.length === 0 ? (
+              <p>ไม่พบ Safe Zone </p>
+            ) : (
+              (() => {
+                // owner ดูสัตว์ทุกตัวในทุก safezone
+                const assignedZones =
+                  user.role === "owner"
+                    ? safezones
+                    : safezones.filter((z) => z.caregiverId === user.uid);
+
+                // กรอง safezone ที่ได้รับมอบหมาย
+                const assignedZoneId = assignedZones.map((z) => z.id);
+
+                // กรองสัตว์ที่อยู่ใน safezone ที่ได้รับมอบหมาย
+                const petsInAssignedZones = pets.filter((pet) =>
+                  assignedZoneId.includes(pet.zoneId)
+                );
+                return petsInAssignedZones.length === 0 ? (
+                  // <p>ไม่มีสัตว์เลี้ยงใน Safe Zone ที่ได้รับมอบหมาย</p>
+                  <div className="text-no">ไม่มีสัตว์เลี้ยงใน Safe Zone </div>
+                ) : (
+                  <table className="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>ชื่อสัตว์</th>
+                        <th>อายุ</th>
+                        <th>สายพันธุ์</th>
+                        <th>Device ID</th>
+                        <th>ละติจูด</th>
+                        <th>ลองจิจูด</th>
+                        <th>แบตเตอรี่ (%)</th>
+                        <th>ระดับแบตเตอรี่</th>
+                        <th>สถานะ GPS</th>
+                        <th>ประวัติ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {petsInAssignedZones.map((pet) => (
+                        <tr key={pet.id}>
+                          <td>{pet.name}</td>
+                          <td>{pet.age || "-"}</td>
+                          <td>{pet.breed || "-"}</td>
+                          <td>{pet.device_id || "-"}</td>
+                          <td>{pet.lat}</td>
+                          <td>{pet.lng}</td>
+                          <td>{pet.battery || "-"}</td>
+                          <td>{pet.batteryLevel || "-"}</td>
+                          <td>{pet.fixStatus || "-"}</td>
+                          <td>
+                            <button
+                              onClick={() => handleShowHistory(pet)}
+                              className="btn-seeHis"
+                            >
+                              ดูประวัติ
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()
+            )}
+          </div>
+        )}
 
         {/* Safe Zone Dropdown */}
         <div className="dashboard-card mb-5">
-          <h2 className="dashboard-label">
-            เลือก Safe Zone
-          </h2>
+          <h2 className="dashboard-label">เลือก Safe Zone</h2>
           <select
             className="dashboard-select"
             value={selectedZone || "all"}
             onChange={(e) => setSelectedZone(e.target.value)}
           >
             <option value="all">ทั้งหมด</option>
-            {safezones.map((zone) => (
+            {assignedZones.map((zone) => (
               <option key={zone.id} value={zone.id}>
                 {zone.name}
               </option>
@@ -397,9 +578,7 @@ const Dashboard = () => {
               selectedPetForHistory &&
               ` — ประวัติ ${selectedPetForHistory.name}`}
           </h2>
-          <div
-            style={{ padding: 0 }}
-          >
+          <div style={{ padding: 0 }}>
             {isLoaded ? (
               <GoogleMap
                 mapContainerStyle={mapContainerStyle}
@@ -410,7 +589,7 @@ const Dashboard = () => {
                 {!showHistory && (
                   <>
                     {selectedZone === "all"
-                      ? safezones.map(
+                      ? assignedZones.map(
                           (zone) =>
                             zone.coordinates && (
                               <Polygon
@@ -566,59 +745,76 @@ const Dashboard = () => {
                 )}
 
                 {/* แสดงประวัติการเคลื่อนไหว */}
-                {showHistory && petHistory.length > 0 && (
-                  <>
-                    {/* เส้นทางการเคลื่อนไหว */}
-                    <Polyline
-                      path={getHistoryPath()}
-                      options={{
-                        strokeColor: "#0066FF",
-                        strokeOpacity: 0.8,
-                        strokeWeight: 3,
-                      }}
-                    />
-
-                    {/* จุดเริ่มต้น (สีเขียว) */}
-                    {petHistory.length > 0 && (
-                      <Marker
-                        position={{
-                          lat: Number(
-                            petHistory[petHistory.length - 1].latitude
-                          ),
-                          lng: Number(
-                            petHistory[petHistory.length - 1].longitude
-                          ),
+                {showHistory &&
+                  selectedPetForHistory &&
+                  filteredHistory.length > 0 && (
+                    <>
+                      {selectedZoneObj && selectedZoneObj.coordinates && (
+                        <Polygon
+                          paths={selectedZoneObj.coordinates}
+                          options={{
+                            fillColor: "#FF0000",
+                            fillOpacity: 0.2,
+                            strokeColor: "#FF0000",
+                            strokeOpacity: 0.8,
+                            strokeWeight: 2,
+                            clickable: false,
+                            editable: false,
+                            zIndex: 1,
+                          }}
+                        />
+                      )}
+                      {/* เส้นทางการเคลื่อนไหว */}
+                      <Polyline
+                        path={getHistoryPath()}
+                        options={{
+                          strokeColor: "#0066FF",
+                          strokeOpacity: 0.8,
+                          strokeWeight: 3,
                         }}
-                        icon={{
-                          url:
-                            "data:image/svg+xml;charset=UTF-8," +
-                            encodeURIComponent(
-                              '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="green" stroke="white" stroke-width="2"/></svg>'
-                            ),
-                        }}
-                        title="จุดเริ่มต้น"
                       />
-                    )}
 
-                    {/* จุดปัจจุบัน (สีแดง) */}
-                    {petHistory.length > 0 && (
-                      <Marker
-                        position={{
-                          lat: Number(petHistory[0].latitude),
-                          lng: Number(petHistory[0].longitude),
-                        }}
-                        icon={{
-                          url:
-                            "data:image/svg+xml;charset=UTF-8," +
-                            encodeURIComponent(
-                              '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="red" stroke="white" stroke-width="2"/></svg>'
+                      {/* จุดเริ่มต้น (สีเขียว) */}
+                      {filteredHistory.length > 0 && (
+                        <Marker
+                          position={{
+                            lat: Number(
+                              filteredHistory[filteredHistory.length - 1].latitude
                             ),
-                        }}
-                        title="ตำแหน่งล่าสุด"
-                      />
-                    )}
-                  </>
-                )}
+                            lng: Number(
+                              filteredHistory[filteredHistory.length - 1].longitude
+                            ),
+                          }}
+                          icon={{
+                            url:
+                              "data:image/svg+xml;charset=UTF-8," +
+                              encodeURIComponent(
+                                '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="green" stroke="white" stroke-width="2"/></svg>'
+                              ),
+                          }}
+                          title="จุดเริ่มต้น"
+                        />
+                      )}
+
+                      {/* จุดปัจจุบัน (สีแดง) */}
+                      {filteredHistory.length > 0 && (
+                        <Marker
+                          position={{
+                            lat: Number(filteredHistory[0].latitude),
+                            lng: Number(filteredHistory[0].longitude),
+                          }}
+                          icon={{
+                            url:
+                              "data:image/svg+xml;charset=UTF-8," +
+                              encodeURIComponent(
+                                '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="red" stroke="white" stroke-width="2"/></svg>'
+                              ),
+                          }}
+                          title="ตำแหน่งล่าสุด"
+                        />
+                      )}
+                    </>
+                  )}
               </GoogleMap>
             ) : (
               <span>กำลังโหลดแผนที่...</span>
@@ -646,29 +842,58 @@ const Dashboard = () => {
                     <option value="all">ทั้งหมด</option>
                   </select>
 
-                  <button
-                    onClick={handleCloseHistory}
-                    className="btn-close"
+                {/*กรองวัน*/ }
+                <div className="gap">
+                  <label>จากวันที่ :</label>
+                  <div>
+                    <input
+                    type="date"
+                    value={startDate || ""}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="dashboard-select"
+                    />
+                  </div>
+
+                  <label>ถึงวันที่ :</label>
+                  <input
+                    type="date"
+                    value={endDate || ""}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="dashboard-select"
+                  />
+                </div>
+
+                {/* กรองสถานะ SafeZone */}
+                <div>
+                  <label>กรองสถานะ Safe Zone: </label>
+                  <select
+                  value={safeZoneFilter}
+                    onChange={(e) => setSafeZoneFilter(e.target.value)}
+                    className="dashboard-select" 
                   >
+                    <option value="all">ทั้งหมด</option>
+                    <option value="inside">ในพื้นที่ปลอดภัย</option>
+                    <option value="outside">นอกพื้นที่ปลอดภัย</option>
+                </select>
+                </div>
+
+                  <button onClick={handleCloseHistory} className="btn-close">
                     ปิด
                   </button>
                 </div>
                 <div>
-                  <button
-                    onClick={handleCleanOldHistory}
-                    className="btn-clear"
-                  >
+                  <button onClick={handleCleanOldHistory} className="btn-clear">
                     ทำความสะอาดประวัติ
                   </button>
                 </div>
               </div>
             </div>
-            
+
             {historyLoading ? (
               <div className="text-center py-4">กำลังโหลดประวัติ...</div>
-            ) : petHistory.length === 0 ? (
+            ) : filteredHistory.length === 0 ? (
               <div className="text-no text-center py-4">
-                ไม่พบประวัติตำแหน่งในช่วงเวลาที่เลือก
+                ไม่พบประวัติตำแหน่ง
               </div>
             ) : (
               <div className="detail-his max-h-64 overflow-auto">
@@ -681,10 +906,11 @@ const Dashboard = () => {
                       <th className="p-2 border">ลองจิจูด</th>
                       <th className="p-2 border">แบตเตอรี่ (%)</th>
                       <th className="p-2 border">ตำแหน่ง</th>
+                      <th className="p-2 border">safezone</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {petHistory.map((record, index) => (
+                    {filteredHistory.map((record, index) => (
                       <tr key={record.id || index}>
                         <td className="p-2 border">
                           {record.datetime
@@ -701,9 +927,7 @@ const Dashboard = () => {
                               )}
                         </td>
                         <td className="p-2 border">{record.latitude || "-"}</td>
-                        <td className="p-2 border">
-                          {record.longitude || "-"}
-                        </td>
+                        <td className="p-2 border">{record.longitude || "-"}</td>
                         <td className="p-2 border">{record.battery || "-"}</td>
                         <td className="p-2 border">
                           <span
@@ -718,6 +942,7 @@ const Dashboard = () => {
                               : "นอกพื้นที่ปลอดภัย"}
                           </span>
                         </td>
+                        <td>{record.safezoneName || "-"}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -736,9 +961,7 @@ const Dashboard = () => {
             {loading ? (
               <div>กำลังโหลดข้อมูล...</div>
             ) : filteredPets.length === 0 ? (
-              <div className="text-no">
-                ไม่พบสัตว์เลี้ยงใน Safe Zone
-              </div>
+              <div className="text-no">ไม่พบสัตว์เลี้ยงใน Safe Zone</div>
             ) : (
               <table className="dashboard-table">
                 <thead>
@@ -751,7 +974,7 @@ const Dashboard = () => {
                     <th>ลองจิจูด</th>
                     <th>วันที่</th>
                     <th>เวลา</th>
-                    <th>Battery (%)</th>
+                    <th>สถานะ GPS</th>
                     <th>Safe Zone</th>
                   </tr>
                 </thead>
@@ -766,9 +989,8 @@ const Dashboard = () => {
                       <td>{pet.lng}</td>
                       <td>{pet.date || "-"}</td>
                       <td>{pet.time || "-"}</td>
-                      <td>{pet.battery || "-"}</td>
-                      <td>{pet.safezoneName || "-"}
-                      </td>
+                      <td>{pet.fixStatus || "-"}</td>
+                      <td>{pet.safezoneName || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -781,4 +1003,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default PetTracking;

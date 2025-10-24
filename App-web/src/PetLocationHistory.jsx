@@ -1,68 +1,93 @@
-// src/utils/PetLocationHistory.js
+
+// PetLocationHistory.js
 import { rtdb } from "./firebase";
-import { ref, get, update, onValue, set , remove } from "firebase/database";
-import { filterPetsByAllSafezones } from "./ChackLocation";
+import { ref, get, onValue, set, remove } from "firebase/database";
+import { filterPetsByAllSafezones } from "./CheckSafeZone";
+
 const lastSaveTimes = new Map(); 
 
 // เก็บ listeners เพื่อใช้ในการ cleanup
 const activeListeners = new Map();
 
 /**
- * บันทึกประวัติตำแหน่งสัตว์ (ปรับปรุง timestamp เพื่อป้องกันการทับซ้อน)
+ * บันทึกประวัติตำแหน่งสัตว์ (บันทึกแยกใน PetHistory)
  */
 export const savePetLocationHistory = async (deviceId, currentData, safezones = []) => {
   if (!deviceId || !currentData) return false;
   
   try {
-    const { latitude, longitude, battery, date, time } = currentData;
+    const { latitude, longitude, satellites, date, time , battery} = currentData;
     
-    //สร้าง timestamp ที่ไม่ซ้ำ
-    const now = Date.now();
-    let timestamp = now;
-    
+    // แปลง date และ time จากข้อมูล LoRa เป็น timestamp
+    let actualTimestamp;
+    if (date && time) {
+      // ลบ "Date: " และ "Time: " ออกก่อน
+      const cleanDate = date.replace("Date: ", "").trim();
+      const cleanTime = time.replace("Time: ", "").trim();
+      
+      // แปลง format จาก DD/MM/YYYY เป็น YYYY-MM-DD
+      const [day, month, year] = cleanDate.split('/');
+      const formattedDate = `${year}-${month}-${day}`;
+      
+      actualTimestamp = new Date(`${formattedDate} ${cleanTime}`).getTime();
+    } else {
+      // fallback: ใช้เวลาปัจจุบัน
+      actualTimestamp = Date.now();
+    }
+
     // ตรวจสอบว่า timestamp นี้มีอยู่แล้วหรือไม่
-    const historyRef = ref(rtdb, `lora_data/${deviceId}/history`);
-    const existingSnapshot = await get(ref(rtdb, `lora_data/${deviceId}/history/${timestamp}`));
+    let timestamp = actualTimestamp;
+    const existingSnapshot = await get(ref(rtdb, `PetHistory/${deviceId}/${timestamp}`));
     
     // ถ้า timestamp ซ้ำ ให้เพิ่มค่าขึ้น 1 มิลลิวินาที
-    while (existingSnapshot.exists()) {
-      timestamp += 1;
-      const nextCheck = await get(ref(rtdb, `lora_data/${deviceId}/history/${timestamp}`));
-      if (!nextCheck.exists()) break;
+    if (existingSnapshot.exists()) {
+      timestamp = actualTimestamp + 1;
+      let nextCheck = await get(ref(rtdb, `PetHistory/${deviceId}/${timestamp}`));
+      while (nextCheck.exists()) {
+        timestamp += 1;
+        nextCheck = await get(ref(rtdb, `PetHistory/${deviceId}/${timestamp}`));
+      }
     }
     
     // แปลงข้อมูลให้เป็นตัวเลข
     const lat = parseFloat(latitude) || 0;
     const lng = parseFloat(longitude) || 0;
-    const batteryLevel = parseInt(battery) || 0;
+    const satelliteCount = parseInt(satellites) || 0;
+    const batteryPer = parseInt(battery); // 
     
     // ตรวจสอบว่าอยู่ใน Safe Zone หรือไม่
     let inSafeZone = false;
+    let safezoneName = null;
     if (safezones && safezones.length > 0) {
-      const petMock = [{ id: deviceId, lat, lng }];
+      const petMock = [{ id: deviceId, name: deviceId , lat, lng }];
       const { inside } = filterPetsByAllSafezones(petMock, safezones);
       inSafeZone = inside.length > 0;
+      if (inside.length > 0) {
+        safezoneName = inside[0].safezoneName || null;
+      }
     }
-    
+
     const historyRecord = {
       latitude: lat,
       longitude: lng,
-      battery: batteryLevel,
-      date: date || new Date(timestamp).toISOString().split('T')[0],
-      time: time || new Date(timestamp).toTimeString().split(' ')[0],
-      timestamp,
+      battery: batteryPer,
+      satellites: satelliteCount,
+      date: date || new Date(actualTimestamp).toLocaleDateString('th-TH'),
+      time: time || new Date(actualTimestamp).toLocaleTimeString('th-TH'),
+      timestamp: actualTimestamp,
       inSafeZone,
-      saved_at: new Date(timestamp).toISOString() //เพิ่มเวลาที่บันทึกจริง
+      safezoneName,
+      saved_at: new Date().toISOString()
     };
     
-    // บันทึกใน path: lora_data/{deviceId}/history/{timestamp}
-    const recordRef = ref(rtdb, `lora_data/${deviceId}/history/${timestamp}`);
+    // บันทึกใน path: PetHistory/{deviceId}/{timestamp}
+    const recordRef = ref(rtdb, `PetHistory/${deviceId}/${timestamp}`);
     await set(recordRef, historyRecord);
     
-    console.log(`✅ History saved for ${deviceId} at ${timestamp}:`, historyRecord);
+    console.log(`History saved for ${deviceId} at ${timestamp}:`, historyRecord);
     
     // จำกัดจำนวนประวัติ (เก็บแค่ 50 records ล่าสุด)
-    await limitHistoryRecords(deviceId, 50);
+    await limitHistoryRecords(deviceId, 8640);
     
     return true;
   } catch (error) {
@@ -74,11 +99,11 @@ export const savePetLocationHistory = async (deviceId, currentData, safezones = 
 /**
  * ดึงประวัติตำแหน่งของสัตว์
  */
-export const getPetLocationHistory = async (deviceId, limit = 20) => {
+export const getPetLocationHistory = async (deviceId, limit = 200) => {
   if (!deviceId) return [];
   
   try {
-    const historyRef = ref(rtdb, `lora_data/${deviceId}/history`);
+    const historyRef = ref(rtdb, `PetHistory/${deviceId}`);
     const snapshot = await get(historyRef);
     
     if (!snapshot.exists()) {
@@ -113,15 +138,20 @@ export const getCurrentDeviceData = async (deviceId) => {
   if (!deviceId) return null;
   
   try {
-    const deviceRef = ref(rtdb, `lora_data/${deviceId}`);
+    const deviceRef = ref(rtdb, `LoRaData/Devices/${deviceId}`);
     const snapshot = await get(deviceRef);
     
     if (snapshot.exists()) {
       const data = snapshot.val();
-      const { history, ...currentData } = data;
+      
+      // นับจำนวนประวัติ
+      const historyRef = ref(rtdb, `PetHistory/${deviceId}`);
+      const historySnapshot = await get(historyRef);
+      const historyCount = historySnapshot.exists() ? Object.keys(historySnapshot.val()).length : 0;
+      
       return {
-        ...currentData,
-        historyCount: history ? Object.keys(history).length : 0
+        ...data,
+        historyCount
       };
     }
     
@@ -144,9 +174,9 @@ export const subscribePetLocationUpdates = (deviceId, safezones = []) => {
     oldUnsubscribe();
   }
   
-  const deviceRef = ref(rtdb, `lora_data/${deviceId}`);
+  const deviceRef = ref(rtdb, `LoRaData/Devices/${deviceId}`);
   let lastDataSnapshot = null;
-  let isFirstLoad = true; // เพิ่ม flag เพื่อจัดการข้อมูลครั้งแรก
+  let isFirstLoad = true;
 
   const SAVE_INTERVAL = 30000; // 30 วินาที
 
@@ -154,30 +184,28 @@ export const subscribePetLocationUpdates = (deviceId, safezones = []) => {
     if (!snapshot.exists()) return;
     
     const currentData = snapshot.val();
-    const { history, ...dataWithoutHistory } = currentData;
     
     // ถ้าเป็นครั้งแรก ให้เก็บข้อมูลและไม่บันทึกประวัติ
     if (isFirstLoad) {
-      lastDataSnapshot = { ...dataWithoutHistory };
+      lastDataSnapshot = { ...currentData };
       isFirstLoad = false;
-      console.log(`Initial data loaded for ${deviceId}, not saving to history`);
+      console.log(`📌 Initial data loaded for ${deviceId}, not saving to history`);
       return;
     }
     
     // ตรวจสอบว่าข้อมูลเปลี่ยนแปลงหรือไม่
-    const hasChanged = hasDataChanged(lastDataSnapshot, dataWithoutHistory);
+    const hasChanged = hasDataChanged(lastDataSnapshot, currentData);
     
     if (!hasChanged) {
-      // ถ้าข้อมูลไม่เปลี่ยน ไม่ต้องทำอะไร
       return;
     }
     
-    //  ข้อมูลเปลี่ยนแปลง - อัปเดต lastDataSnapshot ทันที
+    // ข้อมูลเปลี่ยนแปลง - อัปเดต lastDataSnapshot ทันที
     console.log(`Data changed for ${deviceId}:`, {
       old: lastDataSnapshot,
-      new: dataWithoutHistory
+      new: currentData
     });
-    lastDataSnapshot = { ...dataWithoutHistory };
+    lastDataSnapshot = { ...currentData };
     
     // ตรวจสอบเวลาสำหรับการบันทึก
     const lastSaveTime = lastSaveTimes.get(deviceId) || 0;
@@ -185,7 +213,7 @@ export const subscribePetLocationUpdates = (deviceId, safezones = []) => {
     
     if (now - lastSaveTime >= SAVE_INTERVAL) {
       console.log(`Saving history for ${deviceId} - data changed and interval met`);
-      const success = await savePetLocationHistory(deviceId, dataWithoutHistory, safezones);
+      const success = await savePetLocationHistory(deviceId, currentData, safezones);
       if (success) {
         lastSaveTimes.set(deviceId, now);
       }
@@ -245,7 +273,7 @@ export const unsubscribeAllPetLocationUpdates = () => {
  */
 const limitHistoryRecords = async (deviceId, maxRecords = 50) => {
   try {
-    const historyRef = ref(rtdb, `lora_data/${deviceId}/history`);
+    const historyRef = ref(rtdb, `PetHistory/${deviceId}`);
     const snapshot = await get(historyRef);
     
     if (!snapshot.exists()) return;
@@ -277,33 +305,32 @@ const limitHistoryRecords = async (deviceId, maxRecords = 50) => {
 };
 
 /**
- * ตรวจสอบว่าข้อมูลเปลี่ยนแปลงหรือไม่ (ปรับปรุงให้แม่นยำขึ้น)
+ * ตรวจสอบว่าข้อมูลเปลี่ยนแปลงหรือไม่
  */
 const hasDataChanged = (oldData, newData) => {
-  if (!oldData || !newData) return true; // ข้อมูลครั้งแรก
+  if (!oldData || !newData) return true;
   
-  // เปรียบเทียบแต่ละฟิลด์อย่างละเอียด
   const oldLat = parseFloat(oldData.latitude) || 0;
   const newLat = parseFloat(newData.latitude) || 0;
   const oldLng = parseFloat(oldData.longitude) || 0;
   const newLng = parseFloat(newData.longitude) || 0;
-  const oldBattery = parseInt(oldData.battery) || 0;
-  const newBattery = parseInt(newData.battery) || 0;
+  const oldSatellites = parseInt(oldData.satellites) || 0;
+  const newSatellites = parseInt(newData.satellites) || 0;
   
-  // ตรวจสอบการเปลี่ยนแปลงของตำแหน่ง (ใช้ความแม่นยำ 6 หลัก)
+  // ตรวจสอบการเปลี่ยนแปลง
   const latChanged = Math.abs(oldLat - newLat) > 0.000001;
   const lngChanged = Math.abs(oldLng - newLng) > 0.000001;
-  const batteryChanged = oldBattery !== newBattery;
+  const satellitesChanged = oldSatellites !== newSatellites;
   const dateChanged = oldData.date !== newData.date;
   const timeChanged = oldData.time !== newData.time;
   
-  const isChanged = latChanged || lngChanged || batteryChanged || dateChanged || timeChanged;
+  const isChanged = latChanged || lngChanged || satellitesChanged || dateChanged || timeChanged;
   
   if (isChanged) {
     console.log(`Data change detected:`, {
       latitude: latChanged ? `${oldLat} → ${newLat}` : 'unchanged',
       longitude: lngChanged ? `${oldLng} → ${newLng}` : 'unchanged',
-      battery: batteryChanged ? `${oldBattery} → ${newBattery}` : 'unchanged',
+      satellites: satellitesChanged ? `${oldSatellites} → ${newSatellites}` : 'unchanged',
       date: dateChanged ? `${oldData.date} → ${newData.date}` : 'unchanged',
       time: timeChanged ? `${oldData.time} → ${newData.time}` : 'unchanged'
     });
@@ -313,19 +340,22 @@ const hasDataChanged = (oldData, newData) => {
 };
 
 /**
- * ลบประวัติเก่า
+ * ลบประวัติทั้งหมดของ device
  */
 export const cleanAllHistory = async (deviceId) => {
   try {
-    const historyRef = ref(rtdb, `lora_data/${deviceId}/history`);
+    const historyRef = ref(rtdb, `PetHistory/${deviceId}`);
     
-    await remove(historyRef); //ลบ node ทั้งหมด
+    // นับจำนวน records ก่อนลบ
+    const snapshot = await get(historyRef);
+    const recordCount = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
     
-    console.log(`ลบประวัติทั้งหมดของ ${deviceId} แล้ว`);
-    return true;
+    await remove(historyRef);
+    
+    console.log(`ลบประวัติทั้งหมดของ ${deviceId} แล้ว (${recordCount} records)`);
+    return recordCount;
   } catch (error) {
     console.error("Error cleaning history:", error);
-    return false;
+    return 0;
   }
 };
-

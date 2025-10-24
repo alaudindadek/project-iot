@@ -100,19 +100,16 @@ const isActive = (path) => location.pathname.startsWith(path);
         justifyContent: 'center',
         flex: 1,
       }}>
-        {/* {!user && (
-          <Link to="/login" style={{ color: 'white', textDecoration: 'none' }}>Login</Link>
-        )} */}
         {user && (user.role === 'caregiver' || !user.role) && (
           <>
-            <Link to="/dashboard" style={{ 
-              color: isActive('/dashboard') ? '#ffd700' : 'white',
+            <Link to="/petTracking" style={{ 
+              color: isActive('/petTracking') ? '#ffd700' : 'white',
               marginRight: '2rem',
-              textDecoration: isActive('/dashboard') ? 'none' : 'none',
-              fontWeight: isActive('/dashboard') ? 'bold' : 'normal',
+              textDecoration: isActive('/petTracking') ? 'none' : 'none',
+              fontWeight: isActive('/petTracking') ? 'bold' : 'normal',
               fontSize: '1.5rem',
               textDecorationLine: 'none'
-            }}>Dashboard</Link>
+            }}>PetTracking</Link>
             <Link to="/safezone" style={{ 
               color: isActive('/safezone') ? '#ffd700' : 'white',
               marginRight: '2rem',
@@ -128,20 +125,20 @@ const isActive = (path) => location.pathname.startsWith(path);
               fontWeight: isActive('/report') ? 'bold' : 'normal',
               fontSize: '1.5rem',
               textDecorationLine: 'none'
-            }}>Report</Link>
+            }}>Report-Problem</Link>
             
           </>
         )}
         {user && user.role === 'owner' && (
           <>
-            <Link to="/dashboard" style={{ 
-              color: isActive('/dashboard') ? '#ffd700' : 'white',
+            <Link to="/petTracking" style={{ 
+              color: isActive('/petTracking') ? '#ffd700' : 'white',
               marginRight: '2rem',
-              textDecoration: isActive('/dashboard') ? 'none' : 'none',
-              fontWeight: isActive('/dashboard') ? 'bold' : 'normal',
+              textDecoration: isActive('/petTracking') ? 'none' : 'none',
+              fontWeight: isActive('/petTracking') ? 'bold' : 'normal',
               fontSize: '1.5rem',
               textDecorationLine: 'none'
-            }}>Dashboard</Link>
+            }}>PetTracking</Link>
             <Link to="/manage-pet" style={{ 
               color: isActive('/manage-pet') ? '#ffd700' : 'white',
               marginRight: '2rem',

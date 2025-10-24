@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
+import PetTracking from './pages/PetTracking';
 import ManagePet from './pages/Admin/ManagePet';
 import RoleManagement from './pages/Admin/RoleManagement';
 import SafeZone from './pages/User/SafeZone';
@@ -29,7 +29,7 @@ const AppContent = () => {
           <Route path="/" element={<Navigate to="/login" />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/petTracking" element={<PetTracking />} />
           <Route path="/manage-pet" element={<ManagePet />} />
           <Route path="/role-management" element={<RoleManagement />} />
           <Route path="/notification" element={<Notification />} />

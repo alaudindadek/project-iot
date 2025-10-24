@@ -79,7 +79,7 @@ const Notification = () => {
               const petObj = pets.find(p => p.id === r.pet);
               const senderUser = users.find(u => u.id === r.sender);
               return (
-                <div key={r.id} style={{ background: '#fff9c4', borderRadius: 10, padding: '1.2rem 2rem', marginBottom: 20, position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <div key={r.id} style={{ background: '#f2f2f2', borderRadius: 10, padding: '1.2rem 2rem', marginBottom: 20, position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
                     <b>{petObj ? petObj.name : r.pet}</b>{petObj && petObj.breed ? ` (${petObj.breed})` : ''} - {r.problem}
                     <div>รายละเอียด: {r.detail || '-'}</div>

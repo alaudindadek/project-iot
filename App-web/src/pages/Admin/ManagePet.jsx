@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { db, rtdb } from "../../firebase";
 import {
@@ -7,14 +8,10 @@ import {
   deleteDoc,
   doc,
   updateDoc,
-  query,
-  where,
   getDoc,
 } from "firebase/firestore";
-import { ref, get, onValue } from "firebase/database";
-import Navbar from "../../components/Navbar";
+import { ref, get, onValue, update } from "firebase/database";
 import "./ManagePet.css";
-import { Link } from "react-router-dom";
 
 const ManagePet = () => {
   const [pets, setPets] = useState([]);
@@ -62,36 +59,34 @@ const ManagePet = () => {
     fetchPets();
   }, []);
 
+  // ดึงข้อมูล devices จาก Realtime Database และฟังการเปลี่ยนแปลง
   useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        console.log("กำลังดึงข้อมูล devices...");
-        // ลองดึงทั้งหมดก่อน (ไม่ filter) เพื่อดูว่ามีข้อมูลหรือไม่
-        const allSnapshot = await getDocs(collection(db, "devices"));
-        console.log(
-          "devices ทั้งหมด:",
-          allSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-        );
+    console.log("กำลังเชื่อมต่อ Realtime Database...");
+    const devicesRef = ref(rtdb, "LoRaData/Devices");
 
-        // ดึงเฉพาะที่ Status = available (ใช้ Status ตัวใหญ่)
-        const q = query(
-          collection(db, "devices"),
-          where("Status", "==", "available")
-        );
-        const snapshot = await getDocs(q);
-        const devicesList = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        console.log("devices ที่ available:", devicesList);
-        setDevices(devicesList);
-      } catch (error) {
-        console.error("Error fetching devices:", error);
+    const unsubscribe = onValue(devicesRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const availableDevices = Object.entries(data)
+          .filter(([_, value]) => value.status === "available")
+          .map(([id, value]) => ({ id, ...value }));
+
+        console.log("อัปเดต devices:", availableDevices.length, "รายการ");
+        setDevices(availableDevices);
+        setDevicePositions(data); // อัปเดตตำแหน่งพร้อมกัน
+      } else {
+        console.log("ไม่มีข้อมูล devices");
+        setDevices([]);
       }
+    });
+
+    return () => {
+      console.log("ตัดการเชื่อมต่อ Realtime Database");
+      unsubscribe();
     };
-    fetchDevices();
   }, []);
 
+  // ดึงข้อมูล Safe Zones
   useEffect(() => {
     const fetchSafeZones = async () => {
       const snapshot = await getDocs(collection(db, "safezones"));
@@ -101,35 +96,22 @@ const ManagePet = () => {
     fetchSafeZones();
   }, []);
 
-  // เพิ่ม useEffect สำหรับฟังตำแหน่งจาก Realtime Database
-  useEffect(() => {
-    const lora_dataRef = ref(rtdb, "lora_data");
-
-    const unsubscribe = onValue(lora_dataRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        setDevicePositions(data);
-      }
-    });
-
-    return () => unsubscribe(); // cleanup listener
-  }, []);
+  // ลบ useEffect นี้ออก เพราะรวมกับด้านบนแล้ว
 
   // ฟังก์ชันสำหรับดึงตำแหน่งล่าสุดของ device
   const getDevicePosition = async (deviceId) => {
     try {
-      const deviceRef = ref(rtdb, `lora_data/${deviceId}`);
+      const deviceRef = ref(rtdb, `LoRaData/Devices/${deviceId}`);
       const snapshot = await get(deviceRef);
 
       if (snapshot.exists()) {
         const data = snapshot.val();
         return {
-          lat: data.latitude || 7.210740754264216, // default ถ้าไม่มีข้อมูล
+          lat: data.latitude || 7.210740754264216,
           lng: data.longitude || 100.49371420711375,
         };
       }
 
-      // ถ้าไม่มีข้อมูล return ค่า default
       return {
         lat: 7.210740754264216,
         lng: 100.49371420711375,
@@ -148,7 +130,6 @@ const ManagePet = () => {
     const file = e.target.files[0];
     setImageFile(file);
     if (file && file.size > 2048 * 2048) {
-      // 2MB
       alert("ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB");
       return;
     }
@@ -163,9 +144,10 @@ const ManagePet = () => {
     }
   };
 
-  // เพิ่มสัตว์เลี้ยงใหม่ - แก้ไขเพื่อดึงตำแหน่งจริงจาก Realtime Database
+  // เพิ่มสัตว์เลี้ยงใหม่
   const handleAddPet = async (e) => {
     e.preventDefault();
+
     if (!selectedZone) {
       alert("กรุณาเลือก Safe Zone");
       return;
@@ -176,30 +158,33 @@ const ManagePet = () => {
     }
 
     setLoading(true);
-    let imageBase64 = "";
-    if (imagePreview) imageBase64 = imagePreview;
+    let imageBase64 = imagePreview || "";
 
     try {
-      // ตรวจสอบว่ามี device นี้อยู่ใน Firestore หรือไม่
-      const deviceRef = doc(db, "devices", device_id);
-      const deviceSnap = await getDoc(deviceRef);
+      // ตรวจสอบอุปกรณ์จาก Realtime Database
+      const deviceRef = ref(rtdb, `LoRaData/Devices/${device_id}`);
+      const deviceSnap = await get(deviceRef);
+
       if (!deviceSnap.exists()) {
-        alert("ไม่พบรหัสอุปกรณ์นี้");
+        alert("ไม่พบรหัสอุปกรณ์นี้ในระบบ");
         setLoading(false);
         return;
       }
 
-      // ตรวจสอบว่าอุปกรณ์นี้ถูกใช้งานแล้วหรือยัง
-      if (deviceSnap.data().Status === "in-use") {
+      const deviceData = deviceSnap.val();
+
+      // ตรวจสอบสถานะว่าใช้งานอยู่หรือยัง
+      if (deviceData.status === "in-use") {
         alert("อุปกรณ์นี้ถูกใช้งานแล้ว");
         setLoading(false);
         return;
       }
 
-      // ดึงตำแหน่งล่าสุดจาก Realtime Database แทนการใช้ค่าฮาร์ดโค้ด
+      // ดึงตำแหน่งล่าสุดจาก RTDB
       const position = await getDevicePosition(device_id);
       console.log(`ดึงตำแหน่งของ device ${device_id}:`, position);
 
+      // เพิ่มข้อมูลสัตว์เลี้ยงลง Firestore
       await addDoc(collection(db, "pets"), {
         name,
         breed,
@@ -207,12 +192,13 @@ const ManagePet = () => {
         imageBase64,
         device_id,
         zoneId: selectedZone,
+        latitude: position?.lat || null,
+        longitude: position?.lng || null,
+        createdAt: new Date(),
       });
 
-      // อัปเดตสถานะ device เป็น in-use
-      await updateDoc(deviceRef, {
-        Status: "in-use",
-      });
+      // อัปเดตสถานะอุปกรณ์ใน Realtime Database → "in-use"
+      await update(deviceRef, { status: "in-use" });
 
       // รีเซ็ตฟอร์ม
       setName("");
@@ -223,28 +209,18 @@ const ManagePet = () => {
       setDeviceId("");
       setSelectedZone("");
 
-      // reload pets
+      // โหลด pets ใหม่
       const querySnapshot = await getDocs(collection(db, "pets"));
-      const petsData = [];
-      querySnapshot.forEach((doc) => {
-        petsData.push({ id: doc.id, ...doc.data() });
-      });
-      setPets(petsData);
-
-      // โหลด devices ใหม่
-      const q = query(
-        collection(db, "devices"),
-        where("Status", "==", "available")
-      );
-      const snapshot = await getDocs(q);
-      const devicesList = snapshot.docs.map((doc) => ({
+      const petsData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setDevices(devicesList);
+      setPets(petsData);
 
       alert("เพิ่มสัตว์เลี้ยงสำเร็จ!");
+      // ไม่ต้องโหลด devices ใหม่ เพราะ onValue จะอัปเดตให้อัตโนมัติ
     } catch (err) {
+      console.error("Error:", err);
       alert("เกิดข้อผิดพลาดในการบันทึก: " + err.message);
     } finally {
       setLoading(false);
@@ -273,44 +249,47 @@ const ManagePet = () => {
     setEditImageFile(null);
   };
 
+  // ลบสัตว์เลี้ยง
   const handleDeletePet = async (id) => {
     if (!window.confirm("คุณต้องการลบสัตว์เลี้ยงนี้ใช่หรือไม่?")) return;
+
     setLoading(true);
     try {
+      // อ่านข้อมูลสัตว์เลี้ยงจาก Firestore
       const petRef = doc(db, "pets", id);
       const petSnap = await getDoc(petRef);
+
       if (!petSnap.exists()) {
         alert("ไม่พบสัตว์เลี้ยงนี้");
-        setLoading(false);
         return;
       }
 
       const petData = petSnap.data();
-      const deviceIdToUpdate = petData.device_id;
+      const deviceId = petData.device_id;
 
-      // ลบสัตว์เลี้ยง
+      // ลบสัตว์เลี้ยงจาก Firestore
       await deleteDoc(petRef);
 
-      // // ถ้ามี device_id ให้รีเซ็ตสถานะ device เป็น available
-      // if (deviceIdToUpdate) {
-      //   const deviceRef = doc(db, 'devices', deviceIdToUpdate);
-      //   await updateDoc(deviceRef, { Status: 'available' });
-      // }
+      // ถ้ามีอุปกรณ์เชื่อมอยู่ ให้รีเซ็ตสถานะใน Realtime Database
+      if (deviceId) {
+        const deviceRef = ref(rtdb, `LoRaData/Devices/${deviceId}`);
+        const deviceSnap = await get(deviceRef);
 
-      setPets(pets.filter((p) => p.id !== id));
+        if (deviceSnap.exists()) {
+          await update(deviceRef, { status: "available" });
+          console.log(`อัปเดตสถานะ ${deviceId} -> available แล้ว`);
+        } else {
+          console.warn(`ไม่พบอุปกรณ์ใน RTDB: ${deviceId}`);
+        }
+      }
 
-      // โหลด devices ใหม่
-      const q = query(
-        collection(db, "devices"),
-        where("Status", "==", "available")
-      );
-      const snapshot = await getDocs(q);
-      const devicesList = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setDevices(devicesList);
+      // อัปเดต state หน้าเว็บ
+      setPets((prev) => prev.filter((p) => p.id !== id));
+      // ไม่ต้องโหลด devices ใหม่ เพราะ onValue จะอัปเดตให้อัตโนมัติ
+
+      alert("ลบสัตว์เลี้ยงเรียบร้อยแล้ว");
     } catch (err) {
+      console.error("Error deleting pet:", err);
       alert("เกิดข้อผิดพลาดในการลบ: " + err.message);
     } finally {
       setLoading(false);
@@ -341,15 +320,40 @@ const ManagePet = () => {
     setLoading(true);
     try {
       const petRef = doc(db, "pets", editingPetId);
-      const updatedData = {
-        name: editName,
-        breed: editBreed,
-        age: editAge,
-        zoneId: editZoneId,
-      };
+
+      // สร้าง object สำหรับ update
+      const updatedData = {};
+      updatedData.name = editName;
+      updatedData.breed = editBreed;
+      updatedData.age = editAge;
+      updatedData.zoneId = editZoneId;
+
       if (editImagePreview) {
         updatedData.imageBase64 = editImagePreview;
       }
+
+      // ถ้ามีการเปลี่ยน safe zone ให้อัปเดต caregiver ตาม zone ใหม่
+      if (editZoneId) {
+        try {
+          const zoneRef = doc(db, "safezones", editZoneId);
+          const zoneSnap = await getDoc(zoneRef);
+
+          if (zoneSnap.exists()) {
+            const zoneData = zoneSnap.data();
+            console.log("Zone data:", zoneData);
+
+            // อัปเดต caregiver ตาม safe zone ใหม่
+            if (zoneData.caregiverId && zoneData.caregiverName) {
+              updatedData["caregiverId"] = zoneData.caregiverId;
+              updatedData["caregiverName"] = zoneData.caregiverName;
+            }
+          }
+        } catch (zoneError) {
+          console.error("Error fetching zone data:", zoneError);
+        }
+      }
+
+      console.log("Updated data to save:", updatedData);
       await updateDoc(petRef, updatedData);
       setEditingPetId(null);
       const snapshot = await getDocs(collection(db, "pets"));
@@ -359,7 +363,9 @@ const ManagePet = () => {
       });
       setPets(newPets);
       handleCloseEditModal();
+      alert("อัปเดตข้อมูลสัตว์เลี้ยงสำเร็จ");
     } catch (err) {
+      console.error("Error updating pet:", err);
       alert("เกิดข้อผิดพลาดในการอัปเดต: " + err.message);
     } finally {
       setLoading(false);
@@ -544,7 +550,6 @@ const ManagePet = () => {
         </div>
       </div>
       <div className="managepet-card">
-        {/* ฟอร์มเพิ่มสัตว์เลี้ยง */}
         <h2 className="managepet-label">เพิ่มสัตว์เลี้ยง</h2>
         <form onSubmit={handleAddPet}>
           <div
